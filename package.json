@@ -1,0 +1,7 @@
+{
+  "name": "bundler",
+  "version": "0.0.1",
+  "devDependencies": {
+    "flow-bin": "0.59.x"
+  }
+}
