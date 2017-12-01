@@ -1,7 +1,17 @@
 {
   "name": "bundler",
   "version": "0.0.1",
+  "main": "js/Bundler",
+  "dependencies": {
+    "babel-core": "aleclarson/babel-core#6.25.0",
+    "emptyFunction": "aleclarson/emptyFunction#1.0.0",
+    "fsx": "aleclarson/fsx#1.4.0",
+    "glob-regex": "aleclarson/glob-regex#0.1.0",
+    "is-open-comment": "^0.1.1",
+    "match-any": "^0.0.1"
+  },
   "devDependencies": {
-    "flow-bin": "0.59.x"
+    "flow-bin": "^0.59.0",
+    "testpass": "aleclarson/testpass#0.0.11"
   }
 }
