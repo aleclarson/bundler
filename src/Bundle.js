@@ -4,6 +4,7 @@ import EventEmitter from 'events'
 import crypto from 'crypto'
 import path from 'path'
 
+import type {GenerateBundleConfig} from './utils/generateBundle'
 import type File, {Platform} from './File'
 import type Package from './Package'
 import type Project from './Project'
@@ -19,12 +20,6 @@ export type BundleConfig = {
   polyfills?: string[],
 }
 
-// TODO: Add `minify` option
-type ReadConfig = {
-  dev?: boolean,
-  globals?: Object,
-}
-
 // TODO: Listen to bundler for file events.
 export default class Bundle extends EventEmitter { /*::
   main: File;
@@ -33,7 +28,7 @@ export default class Bundle extends EventEmitter { /*::
   polyfills: ?string[];
   modules: ModuleMap;
   packages: { [name: string]: Package };
-  readPromise: ?Promise<string>;
+  readPromise: ?Promise<?string>;
   readHash: ?string;
 */
   constructor(config: BundleConfig) {
@@ -50,7 +45,8 @@ export default class Bundle extends EventEmitter { /*::
     this.packages = {}
   }
 
-  read(config: ReadConfig = {}): Promise<string> {
+  // TODO: Add `minify` option
+  read(config: GenerateBundleConfig): Promise<?string> {
     const hash = computeHash(config, this.platform, this.project)
 
     let promise = this.readPromise
@@ -65,9 +61,21 @@ export default class Bundle extends EventEmitter { /*::
       }
     }
 
+    let stopped = false
+    config.onStop(function() {
+      stopped = true
+    })
+
     this.readHash = hash
-    return this.readPromise = promise ? patchBundle(this) :
-      this.project.root.crawl().then(() => generateBundle(this, config))
+    return this.readPromise =
+      promise ? (patchBundle(this): any) :
+      this.project.root.crawl({
+        onStop: config.onStop,
+      }).then(() => {
+        if (!stopped) {
+          return generateBundle(this, config)
+        }
+      })
   }
 
   invalidate() {
@@ -75,7 +83,11 @@ export default class Bundle extends EventEmitter { /*::
   }
 }
 
-function computeHash(config: ReadConfig, platform: Platform, project: Project) {
+function computeHash(
+  config: GenerateBundleConfig,
+  platform: Platform,
+  project: Project,
+): string {
   return crypto.createHash('sha256').update([
     platform,
     project.root,

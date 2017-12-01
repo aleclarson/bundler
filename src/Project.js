@@ -7,7 +7,7 @@ import type {CrawlOptions} from './utils/crawl'
 import type {Platform} from './File'
 import type Bundler from './Bundler'
 
-import {forEach} from './utils'
+import {forEach, uhoh} from './utils'
 import Package from './Package'
 import Bundle from './Bundle'
 import File from './File'
@@ -42,12 +42,11 @@ export default class Project { /*::
     this.env = {}
   }
 
-  crawl(config: CrawlOptions = {}): Project {
+  crawl(config: CrawlOptions): Promise<void> {
     if (!config.types) {
       config.types = this.types
     }
-    this.root.crawl(config)
-    return this
+    return this.root.crawl(config)
   }
 
   bundle(config: BundleConfig): Bundle {
@@ -58,9 +57,7 @@ export default class Project { /*::
     } else {
       const main = this.resolveMain(config.platform)
       if (!main) {
-        const error = Error(`Missing main module for platform: '${config.platform}'`)
-        ;(error: any).code = 'NO_MAIN_MODULE'
-        throw error
+        throw uhoh(`Missing main module for platform: '${config.platform}'`, 'NO_MAIN_MODULE')
       }
       this.bundles[config.platform] =
         bundle = new Bundle({

@@ -6,6 +6,7 @@ import fs from 'fsx'
 import type {CrawlOptions} from './utils/crawl'
 import type File, {Platform} from './File'
 import type Bundler from './Bundler'
+import {uhoh} from './utils'
 import crawl from './utils/crawl'
 
 const {loadPlugins} = require('./plugins')
@@ -24,7 +25,8 @@ export default class Package { /*::
   parent: ?Package;
   bundler: Bundler;
   plugins: string[];
-  isCrawled: boolean;
+  crawled: Set<string>;
+  crawling: { [hash: string]: Promise<void> };
 */
   constructor(config: PackageConfig) {
     const {root, parent} = config
@@ -33,7 +35,9 @@ export default class Package { /*::
       this.meta = loadModule(root + '/package.json')
     } catch(error) {
       if (error.code == 'MODULE_NOT_FOUND') {
-        throw Error(`Package must contain a 'package.json' file: '${root}'`)
+        throw uhoh(`Package must contain a 'package.json' file: '${root}'`, 'PJSON_NOT_FOUND')
+      } else {
+        throw error
       }
     }
     if (parent) {
@@ -44,7 +48,8 @@ export default class Package { /*::
       this.bundler = config.bundler
     }
     this.plugins = loadPlugins(this)
-    this.isCrawled = false
+    this.crawled = new Set()
+    this.crawling = {}
   }
 
   get name(): string {
@@ -53,7 +58,7 @@ export default class Package { /*::
       throw Error(`Package has no name: '${this.path}'`)
     }
     // Cache the name now that it's been validated.
-    Object.defineProperty((this: any), 'name', {value: name})
+    setPropGet(this, 'name', getName)
     return name
   }
 
@@ -63,13 +68,12 @@ export default class Package { /*::
       throw Error(`Package has no version: '${this.path}'`)
     }
     // Cache the version now that it's been validated.
-    Object.defineProperty((this: any), 'version', {value: version})
+    setPropGet(this, 'version', getVersion)
     return version
   }
 
-  crawl(config: CrawlOptions = {}) {
-    if  (config.)
-    return crawl(config, this)
+  crawl(config: CrawlOptions): Promise<void> {
+    return crawl(this, config)
   }
 
   // TODO: Support other file types?
@@ -94,11 +98,27 @@ export default class Package { /*::
   hasFile(file: string): boolean {
     const {files} = this.bundler
     if (path.isAbsolute(file)) {
-      return files.hasOwnProperty(file)
+      if (file.startsWith(this.path)) {
+        return files.hasOwnProperty(file)
+      } else {
+        return false
+      }
     } else {
       return files.hasOwnProperty(path.join(this.path, file))
     }
   }
+}
+
+function setPropGet<T>(obj: any, key: string, get: () => T): void {
+  Object.defineProperty(obj, key, {get})
+}
+
+function getName(): string {
+  return this.meta.name
+}
+
+function getVersion(): string {
+  return this.meta.version
 }
 
 function setFileType(file: string, type: string): string {

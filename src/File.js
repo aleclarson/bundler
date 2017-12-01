@@ -1,11 +1,8 @@
 // @flow
 
 import path from 'path'
-import fs from 'fsx'
 
 import type Package from './Package'
-
-import transformFile from './utils/transformFile'
 
 const platformRE = /\.(android|ios|web)$/
 
@@ -33,9 +30,5 @@ export default class File { /*::
 
   get name(): string {
     return path.relative(this.package.path, this.path)
-  }
-
-  read(): string {
-    return transformFile(fs.readFile(this.path), this)
   }
 }

@@ -8,8 +8,6 @@ const bundler = new Bundler()
 const project = bundler.project({
   root: 'example', // Relative to process.cwd() unless `root` is absolute
   types: ['js'], // The default value
-}).crawl({
-  exclude: ['*.test.js'],
 })
 
 const bundle = project.bundle({
@@ -17,12 +15,16 @@ const bundle = project.bundle({
   polyfills: ['require'], // The default value
 })
 
-bundle.read({
-  dev: true, // Defaults to false
-  globals: { // Variables accessible by every module
-    foo: 1,
-  }
-}).then(code => {
-  console.log(code)
+project.crawl({
+  exclude: ['*.test.js'],
+}).then(() => {
+  bundle.read({
+    dev: true, // Defaults to false
+    globals: { // Variables accessible by every module
+      foo: 1,
+    }
+  }).then(code => {
+    console.log(code)
+  })
 })
 ```

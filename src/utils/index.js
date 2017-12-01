@@ -7,3 +7,10 @@ export function forEach<T>(iterable: { [string]: T }, iterator: (value: T, key: 
     iterator(iterable[key], key)
   }
 }
+
+export function uhoh(message: string, code: ?(number|string)): void {
+  const error: any = Error(message)
+  if (code) error.code = code
+  Error.captureStackTrace(error, uhoh)
+  throw error
+}

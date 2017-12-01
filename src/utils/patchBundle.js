@@ -1,12 +1,11 @@
 // @flow
 
+import fs from 'fsx'
+
 import type ModuleMap, {Module} from '../ModuleMap'
 import type Bundle from '../Bundle'
-import type File from '../File'
 
-import resolveImport from './resolveImport'
-import parseImports from './parseImports'
-import {forEach} from '.'
+import readModule from './readModule'
 
 export default function patchBundle(bundle: Bundle): Promise<string> {
   const promise = bundle.readPromise
@@ -26,62 +25,31 @@ export default function patchBundle(bundle: Bundle): Promise<string> {
     // Module refs that could not be resolved.
     const unresolved = new Map
 
-    function readModule(mod: Module): string[] {
-      const {file} = mod
-      const code = file.read()
-
-      // Parse any dependencies.
-      const imports = parseImports(file.type, code)
-      if (imports) {
-        // Remove old dependencies.
-        if (file.imports) {
-          forEach(mod.imports, (dep, ref) => {
-            if (!imports.has(ref)) {
-              delete mod.imports[ref]
-              removeDependency(dep, mod)
-            }
-          })
-        }
-        // Resolve new dependencies.
-        imports.forEach(ref => {
-          if (!mod.imports[ref]) {
-            const depFile = resolveImport(ref, file, bundle)
-            if (depFile) {
-              let dep = modules.get(depFile.id)
-              if (!dep) {
-                added.push(dep = modules.add(depFile))
-              } else {
-                deleted.delete(dep)
-              }
-              mod.imports[ref] = dep
-            } else {
-              let refs = unresolved.get(mod)
-              if (!refs) unresolved.set(mod, refs = new Set)
-              refs.add(ref)
-            }
-          }
-        })
-      } else if (file.imports) {
-        // Remove all old dependencies.
-        forEach(mod.imports, (dep) => removeDependency(dep, mod))
-        mod.imports = {}
-      }
-
-      file.imports = imports
-      return code.split('\n')
-    }
-
-    function removeDependency(dep: Module, mod: Module): void {
-      dep.consumers.delete(mod)
-      if (!dep.consumers.size) {
-        changed.delete(dep)
-        deleted.add(dep)
+    function onChange(event, mod) {
+      switch (event) {
+        case 'add':
+          added.push(mod)
+          break
+        case 'resolve':
+          const dep: Module = arguments[3]
+          deleted.delete(dep)
+          break
+        case 'missing':
+          const ref: string = arguments[2]
+          let refs = unresolved.get(mod)
+          if (!refs) unresolved.set(mod, refs = new Set)
+          refs.add(ref)
+          break
+        case 'delete':
+          changed.delete(mod)
+          deleted.add(mod)
+          break
       }
     }
 
     if (changed.size) {
       changed.forEach(mod => {
-        const code = readModule(mod)
+        const code = readModule(mod, modules, onChange).split('\n')
 
         // Overwrite the module code in the bundle.
         const linesAfter = lines.slice(mod.line + mod.length)
@@ -137,14 +105,14 @@ export default function patchBundle(bundle: Bundle): Promise<string> {
 
     if (added.size) {
       added.forEach(mod => {
-        const code = readModule(mod)
+        const code = readModule(mod, modules, onChange).split('\n')
         mod.length = code.length
         lines = lines.concat(code)
       })
     }
 
     if (unresolved.size) {
-      bundle.emit('unresolved', unresolved)
+      bundle.emit('missing', unresolved)
     }
 
     return lines.join('\n')

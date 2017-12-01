@@ -16,6 +16,7 @@ import type {ProjectConfig} from './Project'
 
 import Project from './Project'
 import Package from './Package'
+import {uhoh} from './utils'
 
 const homedir = require('os').homedir()
 
@@ -23,13 +24,11 @@ export default class Bundler extends EventEmitter { /*::
   files: { [filePath: string]: File };
   packages: { [root: string]: Package };
   versions: { [id: string]: Package };
-  crawled: { [dir: string]: Set<string> };
 */
   constructor() {
     this.files = {}
     this.packages = {}
     this.versions = {}
-    this.crawled = {}
   }
 
   project(config: ProjectConfig): Project {
@@ -38,7 +37,7 @@ export default class Bundler extends EventEmitter { /*::
 
   package(root: string, parent?: Package): Package {
     if (!path.isAbsolute(root)) {
-      throw Error(`Package root must be an absolute path: '${root}'`)
+      throw Error(`Expected an absolute path: '${root}'`)
     }
     const {packages} = this
     if (packages[root] != null) {
@@ -49,53 +48,55 @@ export default class Bundler extends EventEmitter { /*::
         parent,
         bundler: this,
       })
+
+      // Cache the package even if its version is already cached.
       const version = pkg.name + '@' + pkg.version
+      packages[root] = pkg
 
       const {versions} = this
       if (versions[version] != null) {
         return versions[version]
       }
 
-      packages[root] = pkg
       versions[version] = pkg
       return pkg
     }
   }
 
-  file(filePath: string): File {
+  file(filePath: string, pkg: ?Package): File {
     if (!path.isAbsolute(filePath)) {
       throw Error(`Expected an absolute path: '${filePath}'`)
     }
     const {files} = this
     if (files[filePath] == null) {
-      files[filePath] = new File(filePath, this.findPackage(filePath))
+      files[filePath] = new File(filePath, pkg || this.findPackage(filePath))
     } else {
       return files[filePath]
     }
   }
 
-  getFile(filePath: string): File {
+  getFile(filePath: string, types: ?string[]): ?File {
     if (!path.isAbsolute(filePath)) {
       throw Error(`Expected an absolute path: '${filePath}'`)
     }
     const {files} = this
-    if (files[filePath] == null) {
-      return files[filePath]
-    } else {
-      const e = Error(`File not found: '${filePath}'`)
-      e.code = 'FILE_NOT_FOUND'
-      throw e
+    let file = files[filePath]
+    if (file) {
+      return file
+    } else if (types) {
+      for (let i = 0; i < types.length; i++) {
+        file = files[filePath + '.' + types[i]]
+        if (file) return file
+      }
     }
   }
 
-  addFile(filePath: string): void {
+  addFile(filePath: string, pkg: ?Package): void {
     const {files} = this
     if (files[filePath] == null) {
-      files[filePath] = new File(filePath, this.findPackage(filePath))
+      files[filePath] = new File(filePath, pkg || this.findPackage(filePath))
     } else {
-      const e = Error(`File already exists: '${filePath}'`)
-      e.code 'FILE_EXISTS'
-      throw Error(e)
+      throw uhoh(`File already exists: '${filePath}'`, 'FILE_EXISTS')
     }
   }
 
@@ -124,8 +125,4 @@ export default class Bundler extends EventEmitter { /*::
     }
     throw Error(`Failed to find package for file: '${file}'`)
   }
-}
-
-function crawlDir() {
-
 }
