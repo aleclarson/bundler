@@ -1,68 +1,86 @@
 
-const {test, group, header} = require('testpass')
+const tp = require('testpass')
 
-const parseImports = require('../parseImports').default
+const {parseImports} = require('../parseImports')
 
-header('parseImports()')
+tp.header('parseImports()')
 
-group('.js', () => {
-  test('require only', (t) => {
-    const code = `
+const tests = {
+  '.js': [{
+    name: 'require only',
+    paths: ['a', 'b'],
+    code: `
       const a = require('a')
       const b = require("b")
     `
-    const imports = parseImports('js', code)
-    const expected = ['a', 'b']
-    t.eq(imports, new Set(expected))
-  })
-  test('import only', (t) => {
-    const code = `
+  }, {
+    name: 'import only',
+    paths: ['a', 'b'],
+    code: `
       import a from 'a'
       import b from "b"
     `
-    const imports = parseImports('js', code)
-    const expected = ['a', 'b']
-    t.eq(imports, new Set(expected))
-  })
-  test('mixed', (t) => {
-    const code = `
+  }, {
+    name: 'mixed require/import',
+    paths: ['a', 'b', 'c', 'd', 'e'],
+    code: `
       import a from 'a'
       const b = require('b')
       import c as cee from 'c'
       const {x, y} = require('d')
       import * from 'e'
     `
-    const imports = parseImports('js', code)
-    const expected = 'abcde'.split('')
-    t.eq(imports, new Set(expected))
-  })
-  test('comments', (t) => {
-    const code = `
+  }, {
+    name: 'comments',
+    paths: ['a1', 'a3', 'a7'],
+    code: `
       require('a1') // require('a2')
       require('a3')
       /* require('a4')
          require('a5') */
       /* require('a6') */ require('a7')
     `
-    const imports = parseImports('js', code)
-    const expected = ['a1', 'a3', 'a7']
-    t.eq(imports, new Set(expected))
-  })
-  test('unbalanced quotes', (t) => {
-    const code = `import a from 'a"; require('b")`
-    const imports = parseImports('js', code)
-    t.eq(imports.size, 0)
-  })
-  test('no whitespace', (t) => {
-    const code = 'const a=require("a")'
-    const imports = parseImports('js', code)
-    const expected = ['a']
-    t.eq(imports, new Set(expected))
-  })
-})
+  }, {
+    name: 'no whitespace',
+    paths: ['a'],
+    code: `const a=require("a")`
+  }],
+  '.css': [{
+    name: 'single quotes',
+    paths: ['a', 'b'],
+    code: `
+      @import 'a';
+      @import 'b';
+    `
+  }, {
+    name: 'double quotes',
+    paths: ['a', 'b'],
+    code: `
+      @import "a";
+      @import "b";
+    `
+  }, {
+    name: 'comments',
+    paths: [],
+    code: `
+      // @import 'a';
+      /* @import 'b';
+         @import 'c'; */
+    `
+  }]
+}
 
-group('.css', () => {
-  test(t => {
-    t.fail('not yet implemented')
+for (const ext in tests) {
+  tp.group(ext, () => {
+    tests[ext].forEach(test => {
+      const {paths, code} = test
+      tp.test(test.name, (t) => {
+        const imports = parseImports(ext, code)
+        paths.forEach(path => {
+          const {index} = imports.get(path)
+          t.eq(code.slice(index, index + path.length), path)
+        })
+      })
+    })
   })
-})
+}
