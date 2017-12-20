@@ -1,6 +1,11 @@
 {
-  "presets": ["flow", "es2015"],
+  "presets": [
+    ["flow"],
+    ["es2015", {"targets": {"node": "6.5"}}]
+  ],
   "plugins": [
-    ["transform-object-rest-spread", {"useBuiltIns":true}]
+    ["add-module-exports"],
+    ["transform-object-rest-spread", {"useBuiltIns":true}],
+    ["transform-class-properties"]
   ]
 }
