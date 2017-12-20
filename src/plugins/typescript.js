@@ -1,31 +1,51 @@
 // @flow
 
+// TODO: Prefer a global installation of `typescript`
+// TODO: Otherwise, install `typescript` lazily
+// TODO: Load specific version of `typescript` for each package
+
 import path from 'path'
 import fs from 'fsx'
 
-import Package from '../Package'
-import File from '../File'
+import type Package from '../Package'
+import type File from '../File'
+import Plugin from '../Plugin'
 
 const loadModule = (require: any)
 
-exports.isLoaded = false
+let ts: any
 
-exports.loadPlugin = function() {
-  const ts = loadModule('typescript')
-  this.transform = function(code: string, meta: Object): string {
-    return ts.transpileModule(code, meta.tsconfig)
+class TypeScriptPlugin extends Plugin {
+  static fileTypes = ['.ts']
+
+  getOutputType(fileType: string) {
+    return '.js'
+  }
+
+  load() {
+    ts = loadModule('typescript')
+  }
+
+  loadPackage(pkg: Package) {
+    const config = readConfig(pkg)
+    if (config) {
+      pkg.meta._tsconfig = config
+      return true
+    }
+    return false
+  }
+
+  transform(code: string, file: File): string {
+    const config = file.package.meta._tsconfig
+    return ts.transpileModule(code, config)
   }
 }
 
-exports.loadPackage = function(pkg: Package): ?boolean {
+module.exports = TypeScriptPlugin
+
+function readConfig(pkg: Package): ?Object {
   const configPath = path.join(pkg.path, 'tsconfig.json')
-  if (fs.isFile(configPath)) {
-    pkg.meta.tsconfig = loadModule(configPath)
-    return true
-  }
-}
-
-exports.transformFile = function(file: File): string {
-  const code = fs.readFile(file.path)
-  return this.transform(code, file.package.meta)
+  try {
+    return JSON.parse(fs.readFile(configPath))
+  } catch(e) {}
 }

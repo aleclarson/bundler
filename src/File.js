@@ -2,6 +2,7 @@
 
 import path from 'path'
 
+import type {Import} from './utils/parseImports'
 import type Package from './Package'
 
 const platformRE = /\.(android|ios|web)$/
@@ -13,22 +14,30 @@ export default class File { /*::
   type: string;
   package: Package;
   platform: ?Platform;
-  imports: ?Set<string>;
+  imports: ?Map<string, Import>;
 */
-  constructor(file: string, pkg: Package) {
-    const type = path.extname(file)
-    const name = path.basename(file, type)
-    const platform: any = path.extname(name)
+  constructor(filePath: string, fileType: string, pkg: Package) {
+    this.path = filePath
+    this.type = fileType
 
-    this.path = file
-    this.type = type.slice(1)
+    const platform = path.extname(filePath.slice(0, -fileType.length))
     if (platformRE.test(platform)) {
-      this.platform = platform.slice(1)
+      this.platform = (platform: any).slice(1)
     }
+
+    if (!pkg) throw Error('Must provide a package')
     this.package = pkg
   }
 
   get name(): string {
     return path.relative(this.package.path, this.path)
+  }
+
+  test(name: string): boolean {
+    let filePath = this.path
+    if (this.platform) {
+      filePath = filePath.replace('.' + this.platform, '')
+    }
+    return filePath.endsWith(name)
   }
 }

@@ -1,17 +1,31 @@
 {
   "name": "bundler",
   "version": "0.0.1",
-  "main": "js/Bundler",
+  "main": "js/index",
   "dependencies": {
-    "babel-core": "aleclarson/babel-core#6.25.0",
-    "emptyFunction": "aleclarson/emptyFunction#1.0.0",
-    "fsx": "aleclarson/fsx#1.4.0",
-    "glob-regex": "aleclarson/glob-regex#0.1.0",
+    "AsyncTaskGroup": "aleclarson/AsyncTaskGroup#1.1.0",
+    "fsx": "aleclarson/fsx#1.6.0",
+    "glob-regex": "^0.2.0",
+    "huey": "aleclarson/huey#0.1.0",
     "is-open-comment": "^0.1.1",
-    "match-any": "^0.0.1"
+    "match-any": "^0.0.1",
+    "noop": "aleclarson/noop#0.0.1",
+    "read-body": "^0.0.1",
+    "timber": "aleclarson/timber#1.2.1"
   },
   "devDependencies": {
+    "babel-plugin-add-module-exports": "^0.2.1",
+    "babel-plugin-transform-class-properties": "^6.24.1",
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
+    "babel-preset-env": "^1.6.1",
+    "babel-preset-flow": "^6.23.0",
+    "babel-register": "^6.24.1",
+    "coffeescript": "^2.0.3",
     "flow-bin": "^0.59.0",
-    "testpass": "aleclarson/testpass#0.0.11"
-  }
+    "fsx-mock": "aleclarson/fsx-mock#0.0.1",
+    "testpass": "^0.2.0"
+  },
+  "plugins": [
+    "lotus-babel"
+  ]
 }

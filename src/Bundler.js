@@ -1,34 +1,30 @@
-
-/*
-
-Bundler wants to know:
-  - when a package should be crawled
-  - when a package can be cleared
-  - when a module can be cleared
-  - when a module should be updated
-*/
+// @flow
 
 // TODO: Remove a package when unused by all bundles.
 
 import EventEmitter from 'events'
+import path from 'path'
 
 import type {ProjectConfig} from './Project'
 
+import {uhoh, search} from './utils'
 import Project from './Project'
 import Package from './Package'
-import {uhoh} from './utils'
+import File from './File'
 
 const homedir = require('os').homedir()
 
-export default class Bundler extends EventEmitter { /*::
+export default class Bundler { /*::
   files: { [filePath: string]: File };
   packages: { [root: string]: Package };
   versions: { [id: string]: Package };
+  events: EventEmitter;
 */
   constructor() {
     this.files = {}
     this.packages = {}
     this.versions = {}
+    this.events = new EventEmitter()
   }
 
   project(config: ProjectConfig): Project {
@@ -40,42 +36,27 @@ export default class Bundler extends EventEmitter { /*::
       throw Error(`Expected an absolute path: '${root}'`)
     }
     const {packages} = this
-    if (packages[root] != null) {
-      return packages[root]
-    } else {
-      const pkg = new Package({
+    if (!packages.hasOwnProperty(root)) {
+      let pkg = new Package({
         root,
         parent,
         bundler: this,
       })
 
-      // Cache the package even if its version is already cached.
       const version = pkg.name + '@' + pkg.version
-      packages[root] = pkg
-
       const {versions} = this
-      if (versions[version] != null) {
-        return versions[version]
+      if (versions.hasOwnProperty(version)) {
+        pkg = versions[version]
       }
 
+      packages[root] = pkg
       versions[version] = pkg
       return pkg
     }
+    return packages[root]
   }
 
-  file(filePath: string, pkg: ?Package): File {
-    if (!path.isAbsolute(filePath)) {
-      throw Error(`Expected an absolute path: '${filePath}'`)
-    }
-    const {files} = this
-    if (files[filePath] == null) {
-      files[filePath] = new File(filePath, pkg || this.findPackage(filePath))
-    } else {
-      return files[filePath]
-    }
-  }
-
-  getFile(filePath: string, types: ?string[]): ?File {
+  getFile(filePath: string, fileTypes?: Set<string>): ?File {
     if (!path.isAbsolute(filePath)) {
       throw Error(`Expected an absolute path: '${filePath}'`)
     }
@@ -83,46 +64,55 @@ export default class Bundler extends EventEmitter { /*::
     let file = files[filePath]
     if (file) {
       return file
-    } else if (types) {
-      for (let i = 0; i < types.length; i++) {
-        file = files[filePath + '.' + types[i]]
-        if (file) return file
-      }
+    } else if (fileTypes) {
+      return search(fileTypes, (fileType) => {
+        return files[filePath + fileType]
+      })
     }
   }
 
-  addFile(filePath: string, pkg: ?Package): void {
+  addFile(filePath: string, fileType: string, pkg: ?Package): void {
+    if (!path.isAbsolute(filePath)) {
+      throw Error(`Expected an absolute path: '${filePath}'`)
+    }
     const {files} = this
     if (files[filePath] == null) {
-      files[filePath] = new File(filePath, pkg || this.findPackage(filePath))
+      if (!pkg) pkg = this.findPackage(filePath)
+      files[filePath] = new File(filePath, fileType, pkg)
+      if (fileType) {
+        pkg.fileTypes.add(fileType)
+        pkg._loadPlugins(fileType)
+      }
     } else {
       throw uhoh(`File already exists: '${filePath}'`, 'FILE_EXISTS')
     }
   }
 
-  reloadFile(filePath: string): void {
+  reloadFile(filePath: string): boolean {
     const file = this.files[filePath]
     if (file) {
-      this.emit('file:reload', filePath)
+      this.events.emit('file:reload', file)
+      return true
     }
+    return false
   }
 
   deleteFile(filePath: string): boolean {
     const file = this.files[filePath]
     if (file) {
       delete this.files[filePath]
-      this.emit('file:delete', filePath)
+      this.events.emit('file:delete', file)
       return true
     }
     return false
   }
 
-  findPackage(file: string, packages: Object): Package {
-    let dir = file
+  findPackage(filePath: string): Package {
+    let dir = filePath
     while ((dir = path.dirname(dir)) != homedir) {
-      const pkg = packages[dir]
+      const pkg = this.packages[dir]
       if (pkg) return pkg
     }
-    throw Error(`Failed to find package for file: '${file}'`)
+    throw Error(`Failed to find package for file: '${filePath}'`)
   }
 }

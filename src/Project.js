@@ -1,35 +1,41 @@
 // @flow
 
+import globRegex from 'glob-regex'
 import path from 'path'
 import fs from 'fsx'
 
-import type {CrawlOptions} from './utils/crawl'
+import type {MatchFn, RouterFn} from './router'
+import type {CrawlOptions} from './utils/crawlPackage'
 import type {Platform} from './File'
+import type {Watcher} from './utils/watchPackage'
 import type Bundler from './Bundler'
 
 import {forEach, uhoh} from './utils'
+import {createRouter} from './router'
 import Package from './Package'
 import Bundle from './Bundle'
 import File from './File'
 
-const defaultTypes = ['js']
+const defaultTypes = ['.js']
 
-type ResolveFn = (ref: string, src: File, bundle: Bundle) => ?string
 type BundleConfig = {
+  dev: boolean,
+  main?: string,
   platform: Platform,
-  polyfills?: string[],
 }
 
 export type ProjectConfig = {
   root: string,
-  types?: string[],
+  fileTypes?: string[],
+  exclude?: string[],
+  watch?: boolean,
 }
 
 export default class Project { /*::
   +root: Package;
-  +types: string[];
-  +bundles: { [platform: string]: Bundle };
-  +env: { [name: string]: Package };
+  +fileTypes: string[];
+  +excludeRE: ?RegExp;
+  +bundles: { [hash: string]: Bundle };
 */
   constructor(config: ProjectConfig, bundler: Bundler) {
     const root = path.resolve(config.root)
@@ -37,39 +43,86 @@ export default class Project { /*::
       throw Error('Project root must be a directory')
     }
     this.root = bundler.package(root)
-    this.types = config.types || defaultTypes
+
+    // Sort file types for hashing purposes.
+    this.fileTypes = config.fileTypes ?
+      config.fileTypes.sort() : defaultTypes
+
+    // Sort exclude patterns for hashing, too.
+    this.excludeRE = config.exclude ?
+      globRegex(config.exclude.sort()) : null
+
+    // Cache bundles using a hash.
     this.bundles = {}
-    this.env = {}
+
+    if (config.watch) {
+      this.root.watch()
+    }
   }
 
-  crawl(config: CrawlOptions): Promise<void> {
-    if (!config.types) {
-      config.types = this.types
-    }
-    return this.root.crawl(config)
+  get bundler(): Bundler {
+    return this.root.bundler
   }
 
-  bundle(config: BundleConfig): Bundle {
-    let bundle = this.bundles[config.platform]
-    if (bundle) {
-      Object.assign(bundle, config)
-      bundle.invalidate()
-    } else {
-      const main = this.resolveMain(config.platform)
-      if (!main) {
-        throw uhoh(`Missing main module for platform: '${config.platform}'`, 'NO_MAIN_MODULE')
-      }
-      this.bundles[config.platform] =
-        bundle = new Bundle({
-          main,
-          project: this,
-          ...config
-        })
-    }
-    return bundle
+  createRouter(match?: MatchFn): RouterFn {
+    return createRouter(this, match)
   }
 
   resolveMain(platform: ?Platform): ?File {
     return this.root.resolveMain(platform)
+  }
+
+  crawl(config: CrawlOptions = {}): void {
+    if (!config.fileTypes) {
+      config.fileTypes = globRegex(this.fileTypes)
+    }
+    if (!config.exclude && this.excludeRE) {
+      config.exclude = this.excludeRE
+    }
+    this.root.crawl(config)
+  }
+
+  bundle(config: BundleConfig): Bundle {
+
+    // Resolve the entry point.
+    let main: ?File
+    if (config.main) {
+      main = this.root.getFile(config.main)
+    } else {
+      main = this.resolveMain(config.platform)
+    }
+
+    if (main) {
+      const hash = [
+        path.relative(this.root.path, main.path),
+        config.platform || '',
+        config.dev ? 'dev' : '',
+      ].join(':')
+
+      let bundle = this.bundles[hash]
+      if (!bundle) {
+        this.bundles[hash] =
+          bundle = new Bundle({
+            dev: config.dev,
+            main,
+            project: this,
+            platform: config.platform,
+          })
+      }
+      return bundle
+    }
+
+    throw uhoh(`Missing main module for platform: '${config.platform}'`, 'NO_MAIN_MODULE')
+  }
+
+  findBundles(main: string): Bundle[] {
+    const bundles = []
+    for (const hash in this.bundles) {
+      const bundle = this.bundles[hash]
+      if (bundle.main.test(main)) {
+        bundles.push(bundle)
+      }
+    }
+    return bundles
   }
 }

@@ -1,15 +1,21 @@
 // @flow
 
+// TODO: Remove unused packages.
+// TODO: Remove plugins when no files need them.
+
 import path from 'path'
 import fs from 'fsx'
 
-import type {CrawlOptions} from './utils/crawl'
+import type {CrawlOptions} from './utils/crawlPackage'
 import type File, {Platform} from './File'
+import type {Watcher} from './utils/watchPackage'
 import type Bundler from './Bundler'
-import {uhoh} from './utils'
-import crawl from './utils/crawl'
+import type Plugin from './Plugin'
 
-const {loadPlugins} = require('./plugins')
+import {uhoh} from './utils'
+import {getPlugins} from './plugins'
+import {crawlPackage} from './utils/crawlPackage'
+import {watchPackage} from './utils/watchPackage'
 
 const loadModule = (require: any)
 
@@ -24,17 +30,18 @@ export default class Package { /*::
   meta: Object;
   parent: ?Package;
   bundler: Bundler;
-  plugins: string[];
+  watcher: ?Watcher;
   crawled: Set<string>;
-  crawling: { [hash: string]: Promise<void> };
+  fileTypes: Set<string>;
+  plugins: { [fileType: string]: Set<Plugin> };
 */
   constructor(config: PackageConfig) {
     const {root, parent} = config
     this.path = root
     try {
-      this.meta = loadModule(root + '/package.json')
+      this._readMeta()
     } catch(error) {
-      if (error.code == 'MODULE_NOT_FOUND') {
+      if (error.code == 'FILE_NOT_FOUND') {
         throw uhoh(`Package must contain a 'package.json' file: '${root}'`, 'PJSON_NOT_FOUND')
       } else {
         throw error
@@ -43,13 +50,15 @@ export default class Package { /*::
     if (parent) {
       this.parent = parent
       this.bundler = parent.bundler
-    } else {
+    } else if (config.bundler) {
       this.parent = null
       this.bundler = config.bundler
+    } else {
+      throw Error('Must define `config.parent` or `config.bundler`')
     }
-    this.plugins = loadPlugins(this)
     this.crawled = new Set()
-    this.crawling = {}
+    this.fileTypes = new Set()
+    this.plugins = {}
   }
 
   get name(): string {
@@ -72,9 +81,18 @@ export default class Package { /*::
     return version
   }
 
-  crawl(config: CrawlOptions): Promise<void> {
-    return crawl(this, config)
+  crawl(config?: CrawlOptions): void {
+    crawlPackage(this, config)
   }
+
+  watch(): void {
+    if (!this.watcher) {
+      this.watcher = watchPackage(this)
+    }
+  }
+
+  // TODO: Add ability to watch specific file for changes.
+  // watchFile(file: string): void {}
 
   // TODO: Support other file types?
   resolveMain(platform: ?Platform): ?File {
@@ -105,6 +123,62 @@ export default class Package { /*::
       }
     } else {
       return files.hasOwnProperty(path.join(this.path, file))
+    }
+  }
+
+  getFile(file: string): ?File {
+    if (!path.isAbsolute(file)) {
+      file = path.join(this.path, file)
+    }
+    return this.bundler.getFile(file, this.fileTypes)
+  }
+
+  hasDependency(name: string, dev?: boolean): boolean {
+    const deps = dev ? this.meta.devDependencies : this.meta.dependencies
+    return deps != null && deps[name] != null
+  }
+
+  findDependency(name: string, dev?: boolean): ?string {
+    for (let pkg = this; pkg != null; pkg = pkg.parent) {
+      if (pkg.hasDependency(name, dev)) {
+        return path.join(pkg.path, 'node_modules', name)
+      }
+    }
+  }
+
+  _readMeta(): void {
+    const metaPath = path.join(this.path, 'package.json')
+    this.meta = JSON.parse(fs.readFile(metaPath))
+  }
+
+  _loadPlugins(fileType: string): void {
+    const plugins = this.plugins[fileType]
+    if (plugins) return
+
+    const outputTypes = new Set()
+    getPlugins(fileType).forEach(plugin => {
+      if (plugin.loadPackage(this)) {
+        if (plugins) {
+          plugins.add(plugin)
+        } else {
+          this.plugins[fileType] = new Set([ plugin ])
+        }
+
+        // Prepare the plugin.
+        if (!plugin.loaded) {
+          plugin.loaded = true
+          plugin.load()
+        }
+
+        // Load plugins for output types.
+        const outputType = plugin.getOutputType(fileType)
+        if (outputType) outputTypes.add(outputType)
+      }
+    })
+
+    if (outputTypes.size) {
+      outputTypes.forEach(fileType =>
+        this._loadPlugins(fileType))
     }
   }
 }

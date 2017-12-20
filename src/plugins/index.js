@@ -1,34 +1,71 @@
 // @flow
 
-import type Package from '../Package'
+import type File from '../File'
+import Plugin from '../Plugin'
 
-type PluginCache = { [string]: Plugin }
-type Plugin = {
-  isLoaded: boolean,
-  loadPlugin: () => void,
-  loadPackage: (pkg: Package) => ?boolean,
-}
+import {traverse} from '../utils'
 
-const plugins: PluginCache = {
-  babel: require('./babel'),
-  typescript: require('./typescript'),
-}
+// List of plugins per file type
+const registry: { [string]: Plugin[] } = {}
 
-export function getPlugin(pluginId: string): Object {
-  return plugins[pluginId]
-}
+// Default plugins
+addPlugin(require('./babel'))
+addPlugin(require('./postcss'))
+addPlugin(require('./sass'))
+addPlugin(require('./typescript'))
 
-export function loadPlugins(pkg: Package): string[] {
-  const loaded = []
-  for (const pluginId in plugins) {
-    const plugin = plugins[pluginId]
-    if (plugin.loadPackage(pkg)) {
-      loaded.push(pluginId)
-      if (!plugin.isLoaded) {
-        plugin.loadPlugin()
-        plugin.isLoaded = true
+export function addPlugin(plugin: mixed): void {
+  if (typeof plugin == 'function') {
+    plugin = new plugin()
+  }
+  if (!(plugin instanceof Plugin)) {
+    throw TypeError('All plugins must inherit from the `Plugin` class')
+  }
+  const fileTypes: string[] = plugin.fileTypes || plugin.constructor.fileTypes
+  for (let i = 0; i < fileTypes.length; i++) {
+    const fileType = fileTypes[i]
+    const plugins = registry[fileType]
+    if (plugins) {
+      let index = 0
+      while (plugin.priority <= plugins[index].priority) {
+        if (++index == plugins.length) break
       }
+      plugins.splice(index, 0, plugin)
+    } else {
+      registry[fileType] = [plugin]
     }
   }
-  return loaded
+}
+
+export function getPlugins(fileType: string): Plugin[] {
+  return registry[fileType] || []
+}
+
+export function getOutputType(fileType: string): string {
+  while (true) {
+    const plugins = getPlugins(fileType)
+    let outputType: ?string
+    for (let i = 0; i < plugins.length; i++) {
+      if (outputType = plugins[i].getOutputType(fileType)) {
+        fileType = outputType
+        break
+      }
+    }
+    if (!outputType) {
+      break
+    }
+  }
+  return fileType
+}
+
+export async function transformFile(code: string, file: File): Promise<string> {
+  const plugins = file.package.plugins[file.type]
+  if (plugins) {
+    await traverse(plugins, async (plugin) => {
+      if (typeof plugin.transform == 'function') {
+        code = await plugin.transform(code, file)
+      }
+    })
+  }
+  return code
 }
