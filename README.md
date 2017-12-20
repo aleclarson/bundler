@@ -2,29 +2,24 @@
 # cara v0.0.1 ![experimental](https://img.shields.io/badge/stability-experimental-EC5315.svg?style=flat)
 
 ```js
-const Bundler = require('bundler')
+const {Bundler} = require('cara')
 
 const bundler = new Bundler()
 const project = bundler.project({
-  root: 'example', // Relative to process.cwd() unless `root` is absolute
-  types: ['js'], // The default value
+  root: '/path/to/cwd',
+  types: ['js'],
 })
 
 const bundle = project.bundle({
-  platform: 'ios', // Required target platform
-  polyfills: ['require'], // The default value
+  dev: true,
+  platform: 'ios',
 })
 
 project.crawl({
   exclude: ['*.test.js'],
-}).then(() => {
-  bundle.read({
-    dev: true, // Defaults to false
-    globals: { // Variables accessible by every module
-      foo: 1,
-    }
-  }).then(code => {
-    console.log(code)
-  })
 })
+
+const code = await bundle.read()
 ```
+
+Ready to dive deeper? [Read this in-depth guide]() or view the [API documentation]().
