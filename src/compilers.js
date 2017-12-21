@@ -1,7 +1,7 @@
 // @flow
 
-import type Bundle, {Module} from '../Bundle'
-import type Package from '../Package'
+import type Bundle, {Module} from './Bundle'
+import type Package from './Package'
 
 export interface Compiler {
   bundle: Bundle;

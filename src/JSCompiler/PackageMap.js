@@ -2,9 +2,9 @@
 
 // TODO: Auto-upgrade package if duplicate has higher minor/patch version.
 
-import type Bundle, {Module} from '../../Bundle'
-import type File, {Platform} from '../../File'
-import type Package from '../../Package'
+import type Bundle, {Module} from '../Bundle'
+import type File, {Platform} from '../File'
+import type Package from '../Package'
 
 import path from 'path'
 

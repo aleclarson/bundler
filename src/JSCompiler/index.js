@@ -7,11 +7,11 @@
 import path from 'path'
 import fs from 'fsx'
 
-import type Bundle, {Module} from '../../Bundle'
-import type Package from '../../Package'
-import type File from '../../File'
+import type Bundle, {Module} from '../Bundle'
+import type Package from '../Package'
+import type File from '../File'
 
-import {forEach} from '../../utils'
+import {forEach} from '../utils'
 
 import PackageMap from './PackageMap'
 
