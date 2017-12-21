@@ -14,7 +14,7 @@ import {getOutputType, transformFile} from '../plugins'
 // Called when a module stops depending on another.
 type UnlinkListener = (mod: Module, dep: Module) => void
 
-export async function readModule(
+export async function loadModule(
   mod: Module,
   bundle: Bundle,
   onResolve: ResolveListener,

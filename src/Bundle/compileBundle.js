@@ -12,7 +12,7 @@ import type File from '../File'
 
 import {uhoh, forEach} from '../utils'
 import {transformFile} from '../plugins'
-import {readModule} from './readModule'
+import {loadModule} from './loadModule'
 
 type CompilerConfig = {
   onStop: Function,
@@ -39,8 +39,8 @@ export async function compileBundle(
   // Module refs that cannot be resolved.
   const missing = new Map()
 
-  // Read one module at a time.
-  const reading = new AsyncTaskGroup(1)
+  // Load one module at a time.
+  const loading = new AsyncTaskGroup(1)
 
   // Prevent duplicate modules.
   const deps: Set<Module> = new Set()
@@ -49,11 +49,11 @@ export async function compileBundle(
   const main = bundle.getModule(bundle.main)
   if (main) {
     deps.add(main)
-    onRead(await readModule(main, bundle, onResolve, noop), main)
+    onRead(await loadModule(main, bundle, onResolve, noop), main)
   }
 
-  // Wait on every module in the bundle...
-  await reading.push(noop).promise
+  // Wait for all modules to load...
+  await loading.push(noop).promise
 
   if (stopped) {
     bundle.reset()
@@ -94,16 +94,16 @@ export async function compileBundle(
       const mod = dep
       const {file} = mod
       if (file.imports) {
-        reading.push(async () => {
+        loading.push(async () => {
           if (stopped) return
           const code = await transformFile(fs.readFile(file.path), file)
           forEach(mod.imports, (dep, ref) => onResolve(mod, ref, dep))
           onRead(code, mod)
         })
       } else {
-        reading.push(async () => {
+        loading.push(async () => {
           if (stopped) return
-          const code = await readModule(mod, bundle, onResolve, noop)
+          const code = await loadModule(mod, bundle, onResolve, noop)
           onRead(code, mod)
         })
       }

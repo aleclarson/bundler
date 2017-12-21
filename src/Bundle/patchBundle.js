@@ -1,6 +1,6 @@
 // @flow
 
-// TODO: Allow `patchBundle` to be stopped when it's reading new modules?
+// TODO: Allow `patchBundle` to be stopped when it's loading new modules?
 
 import AsyncTaskGroup from 'AsyncTaskGroup'
 import path from 'path'
@@ -10,7 +10,7 @@ import type Bundle, {Module} from '.'
 
 import {forEach, traverse} from '../utils'
 import {resolveImports} from './resolveImports'
-import {readModule} from './readModule'
+import {loadModule} from './loadModule'
 
 export async function patchBundle(
  bundle: Bundle,
@@ -53,29 +53,29 @@ async function createPatch(bundle: Bundle): Promise<Patch> {
  // Module refs that cannot be resolved.
  const missing: Map<Module, Set<string>> = new Map
 
- let reading
+ let loading
  if (bundle.missing.size) {
-   reading = new AsyncTaskGroup(1)
+   loading = new AsyncTaskGroup(1)
    await traverse(bundle.missing, async (mod) => {
      resolveImports(mod, bundle, onResolve)
    })
    bundle.missing.clear()
 
-   // Wait for new modules to be parsed.
-   await reading.push(noop).promise
+   // Wait for new modules to be loaded.
+   await loading.push(noop).promise
  }
 
  while (bundle.changed.size) {
-   reading = new AsyncTaskGroup(1)
+   loading = new AsyncTaskGroup(1)
    await traverse(bundle.changed, async (mod) => {
-     const code = await readModule(mod, bundle, onResolve, onUnlink)
+     const code = await loadModule(mod, bundle, onResolve, onUnlink)
      const modIndex = order.indexOf(mod)
      changes[modIndex] = {mod, code, index: mod.index}
    })
    bundle.changed.clear()
 
-   // Wait for new modules to be parsed, which may rename a package.
-   await reading.push(noop).promise
+   // Wait for new modules to be loaded, which may rename a package.
+   await loading.push(noop).promise
  }
 
  if (bundle.deleted.size) {
@@ -138,8 +138,8 @@ async function createPatch(bundle: Bundle): Promise<Patch> {
      } else {
        compiler.addModule(mod)
      }
-     reading.push(async () => {
-       const code = await readModule(mod, bundle, onResolve, noop)
+     loading.push(async () => {
+       const code = await loadModule(mod, bundle, onResolve, noop)
        added.push({mod, code, index: -1})
      })
    } else {
