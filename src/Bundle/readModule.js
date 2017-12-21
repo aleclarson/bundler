@@ -6,7 +6,7 @@ import fs from 'fsx'
 import type Bundle, {Module} from '../Bundle'
 import type {ResolveListener} from './resolveImports'
 
-import {forEach} from '.'
+import {forEach} from '../utils'
 import {parseImports} from './parseImports'
 import {resolveImports} from './resolveImports'
 import {getOutputType, transformFile} from '../plugins'

@@ -9,8 +9,8 @@ import noop from 'noop'
 import type Bundle, {Module} from '.'
 
 import {forEach, traverse} from '../utils'
-import {resolveImports} from '../utils/resolveImports'
-import {readModule} from '../utils/readModule'
+import {resolveImports} from './resolveImports'
+import {readModule} from './readModule'
 
 export async function patchBundle(
  bundle: Bundle,

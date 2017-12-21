@@ -12,7 +12,7 @@ import type File from '../File'
 
 import {uhoh, forEach} from '../utils'
 import {transformFile} from '../plugins'
-import {readModule} from '../utils/readModule'
+import {readModule} from './readModule'
 
 type CompilerConfig = {
   onStop: Function,

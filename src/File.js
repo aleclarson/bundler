@@ -2,7 +2,7 @@
 
 import path from 'path'
 
-import type {Import} from './utils/parseImports'
+import type {Import} from './Bundle/parseImports'
 import type Package from './Package'
 
 const platformRE = /\.(android|ios|web)$/
