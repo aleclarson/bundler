@@ -7,12 +7,12 @@ import noop from 'noop'
 import path from 'path'
 import fs from 'fsx'
 
-import type Bundle, {Module} from '../Bundle'
+import type Bundle, {Module} from '.'
 import type File from '../File'
 
-import {uhoh, forEach} from '.'
+import {uhoh, forEach} from '../utils'
 import {transformFile} from '../plugins'
-import {readModule} from './readModule'
+import {readModule} from '../utils/readModule'
 
 type CompilerConfig = {
   onStop: Function,

@@ -5,17 +5,17 @@
 import EventEmitter from 'events'
 import path from 'path'
 
-import type {Compiler} from './compilers'
-import type File, {Platform} from './File'
-import type Package from './Package'
-import type Project from './Project'
-import type Bundler from './Bundler'
+import type {Compiler} from '../compilers'
+import type File, {Platform} from '../File'
+import type Package from '../Package'
+import type Project from '../Project'
+import type Bundler from '../Bundler'
 
-import {getPlugins, getOutputType} from './plugins'
-import {compileBundle} from './utils/compileBundle'
-import {loadCompiler} from './compilers'
-import {patchBundle} from './utils/patchBundle'
-import {uhoh} from './utils'
+import {getPlugins, getOutputType} from '../plugins'
+import {compileBundle} from './compileBundle'
+import {loadCompiler} from '../compilers'
+import {patchBundle} from './patchBundle'
+import {uhoh} from '../utils'
 
 export type BundleConfig = {
   dev: boolean,
