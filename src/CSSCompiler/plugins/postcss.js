@@ -3,9 +3,9 @@
 // TODO: Install `postcss` lazily
 // TODO: Source map support
 
-import type Package from '../Package'
-import type File from '../File'
-import Plugin from '../Plugin'
+import type Package from '../../Package'
+import type File from '../../File'
+import Plugin from '../../Plugin'
 
 const loadModule = (require: any)
 

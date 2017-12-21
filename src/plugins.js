@@ -1,18 +1,18 @@
 // @flow
 
-import type File from '../File'
-import Plugin from '../Plugin'
+import type File from './File'
+import Plugin from './Plugin'
 
-import {traverse} from '../utils'
+import {traverse} from './utils'
 
 // List of plugins per file type
 const registry: { [string]: Plugin[] } = {}
 
 // Default plugins
-addPlugin(require('./babel'))
-addPlugin(require('./postcss'))
-addPlugin(require('./sass'))
-addPlugin(require('./typescript'))
+addPlugin(require('./JSCompiler/plugins/babel'))
+addPlugin(require('./JSCompiler/plugins/typescript'))
+addPlugin(require('./CSSCompiler/plugins/postcss'))
+addPlugin(require('./CSSCompiler/plugins/sass'))
 
 export function addPlugin(plugin: mixed): void {
   if (typeof plugin == 'function') {

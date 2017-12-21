@@ -3,8 +3,8 @@
 // TODO: Install `node-sass` lazily
 // TODO: Source map support
 
-import type File from '../File'
-import Plugin from '../Plugin'
+import type File from '../../File'
+import Plugin from '../../Plugin'
 
 const loadModule = (require: any)
 

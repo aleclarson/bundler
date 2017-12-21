@@ -8,11 +8,11 @@
 import path from 'path'
 import fs from 'fsx'
 
-import type Package from '../Package'
-import type File from '../File'
-import Plugin from '../Plugin'
+import type Package from '../../Package'
+import type File from '../../File'
+import Plugin from '../../Plugin'
 
-import {forEach} from '../utils'
+import {forEach} from '../../utils'
 
 const loadModule = (require: any)
 const defaultConfig = {
