@@ -5,17 +5,22 @@
 import EventEmitter from 'events'
 import path from 'path'
 
-import type {Compiler} from '../compilers'
 import type File, {Platform} from '../File'
+import type Compiler from '../Compiler'
 import type Package from '../Package'
 import type Project from '../Project'
 import type Bundler from '../Bundler'
+import Module from './Module'
 
-import {getPlugins, getOutputType} from '../plugins'
-import {compileBundle} from './compileBundle'
 import {loadCompiler} from '../compilers'
-import {patchBundle} from './patchBundle'
+import {getPlugins} from '../plugins'
 import {uhoh} from '../utils'
+
+import {compileBundle} from './compileBundle'
+import {patchBundle} from './patchBundle'
+
+export {default as Module} from './Module'
+export {default as Patcher} from './Patcher'
 
 export type BundleConfig = {
   dev: boolean,
@@ -30,33 +35,33 @@ interface ReadConfig {
 }
 
 export default class Bundle { /*::
-  +dev: boolean;
-  +main: File;
-  +type: string;
-  +events: EventEmitter;
-  +project: Project;
-  +platform: Platform;
-  map: Map<File, Module>;
-  order: Module[];
-  changed: Set<Module>;
-  deleted: Set<Module>;
-  missing: Set<Module>;
-  compiler: Compiler;
-  hasCompiled: boolean;
-  promise: ?Promise<string>;
+  +dev: boolean
+  +main: File
+  +type: string
+  +events: EventEmitter
+  +project: Project
+  +platform: Platform
+  _map: Map<File, Module>
+  _first: Module
+  _final: Module
+  _promise: ?Promise<string>
+  _compiler: Compiler
+  _canPatch: boolean
+  _changes: Set<Module>
 */
   constructor(config: BundleConfig) {
     this.dev = config.dev
     this.main = config.main
-    this.type = getOutputType(this.main.type)
+    this.type = getBundleType(this.main)
     this.events = new EventEmitter()
     this.project = config.project
     this.platform = config.platform
+
+    this._first = this.addModule(this.main)
     this.reset()
 
-    this.addModule(this.main)
     this.bundler.events
-      .on('file:reload', this.reloadModule.bind(this))
+      .on('file:reload', this.patchModule.bind(this))
       .on('file:delete', this.deleteModule.bind(this))
   }
 
@@ -65,86 +70,102 @@ export default class Bundle { /*::
   }
 
   get needsPatch(): boolean {
-    return this.missing.size > 0 ||
-      this.changed.size > 0 || this.deleted.size > 0
+    return this._changes.size > 0
   }
 
   reset(): void {
-    this.map = new Map()
-    this.order = []
-    this.changed = new Set()
-    this.deleted = new Set()
-    this.missing = new Set()
-    this.compiler = loadCompiler(this)
-    this.hasCompiled = false
-    this.promise = null
+    this._map = new Map()
+    this._final = this._first
+    this._promise = null
+    this._compiler = loadCompiler(this)
+    this._canPatch = false
+    this._changes = new Set()
   }
 
-  // TODO: Add `minify` option
   read(config: ReadConfig): Promise<string> {
-    let {promise} = this
-    if (promise) {
-      if (this.needsPatch) {
-        return this.promise = patchBundle(this, config)
-      } else {
-        return promise
-      }
-    } else {
-      return this.promise = compileBundle(this, config)
+    if (!this._promise) {
+      return this._promise = compileBundle(this, config)
     }
+    else if (this._changes.size) {
+      return this._promise = patchBundle(this, config)
+    }
+    return this._promise
   }
 
   relative(filePath: string): string {
     return path.relative(this.main.package.path, filePath)
   }
 
+  indexOf(file: File): number {
+    let i = 0
+    let mod = this._first
+    while (mod) {
+      if (mod.file == file) {
+        return i
+      }
+      i += 1
+    }
+    return -1
+  }
+
   hasFile(file: File): boolean {
-    return this.map.has(file)
+    return this._map.has(file)
   }
 
   getModule(file: File): ?Module {
-    const mod = this.map.get(file)
+    const mod = this._map.get(file)
     if (mod) return mod
   }
 
+  getModules(status: ?number): Module[] {
+    if (status == 200) {
+      return this.getModules().filter(mod => mod._status == 200)
+    } else {
+      const modules = []
+      if (status == null) {
+        let mod = this._first
+        while (mod) {
+          modules.push(mod)
+          mod = mod._next
+        }
+      } else {
+        this._changes.forEach(mod => {
+          if (mod._status == status) {
+            modules.push(mod)
+          }
+        })
+      }
+      return modules
+    }
+  }
+
   addModule(file: File): Module {
-    let mod = this.map.get(file)
+    let mod = this._map.get(file)
     if (mod) {
       // Reuse modules that have been "deleted", but not yet processed.
-      if (mod.isDeleted) {
+      if (mod._status < 0) {
+        mod._status = 200
         mod.file = file
-        mod.isDeleted = undefined
-        this.deleted.delete(mod)
       } else {
         uhoh(`Module already exists: '${file.path}'`, 'MODULE_EXISTS')
       }
     } else {
-      this.map.set(file, mod = new Module(file))
+      mod = this._compiler.createModule(file)
+      this._map.set(file, mod)
     }
     return mod
   }
 
   // Add the module to the dirty queue.
-  reloadModule(file: File): boolean {
-    const mod = this.map.get(file)
-    if (mod && !mod.isDeleted) {
-      this.missing.delete(mod)
-      this.changed.add(mod)
-      return true
-    }
-    return false
+  patchModule(file: File): boolean {
+    const mod = this._map.get(file)
+    return !!mod && this._patchModule(mod)
   }
 
   // Add the module to the removal queue.
   deleteModule(file: File): boolean {
-    const mod = this.map.get(file)
-    if (mod && !mod.isDeleted) {
-      mod.isDeleted = true
-      this.deleted.add(mod)
-      this.changed.delete(mod)
-      return true
-    }
-    return false
+    const mod = this._map.get(file)
+    return !!mod && this._deleteModule(mod)
   }
 
   on(event: string, listener: Function): void {
@@ -158,32 +179,58 @@ export default class Bundle { /*::
       this.events.removeAllListeners(event)
     }
   }
+
+  _patchModule(mod: Module): boolean {
+    const status = mod._status
+
+    // Deleted modules cannot be patched.
+    if (status < 0) return false
+
+    // Mark the module as changed, if necessary.
+    if (status != 1 && status != 201) {
+      mod._status = 1
+      this._changes.add(mod)
+    }
+    return true
+  }
+
+  _deleteModule(mod: Module): boolean {
+    if (mod._status > 0) {
+      mod._body = null
+      mod._status = -1
+      this._changes.add(mod)
+      return true
+    }
+    return false
+  }
 }
 
-export class Module { /*::
-  file: File;
-  index: number;
-  length: number;
-  imports: { [ref: string]: Module };
-  parents: Set<Module>;
-  isDeleted: ?boolean;
-*/
-  constructor(file: File) {
-    this.file = file
-    this.index = -1
-    this.length = -1
-    this.imports = {}
-    this.parents = new Set()
-  }
+function getBundleType(main: File): string {
+  const pkg = main.package
+  let bundleType = main.type
+  while (true) {
+    const plugins = pkg.plugins[bundleType]
+    if (!plugins) {
+      return bundleType
+    }
 
-  // Force this module to resolve an import again.
-  unlink(dep: Module): void {
-    const {imports} = this
-    for (const ref in imports) {
-      if (imports[ref] == this) {
-        delete imports[ref]
+    let outputType
+    for (let i = 0; i < plugins.length; i++) {
+      const {fileTypes} = plugins[i]
+      if (!fileTypes || Array.isArray(fileTypes)) {
+        continue
+      }
+      if (fileTypes.hasOwnProperty(bundleType)) {
+        outputType = fileTypes[bundleType]
         break
       }
+      throw Error(`Unsupported file type: '${bundleType}'`)
+    }
+    if (outputType) {
+      bundleType = outputType
+    } else {
+      return bundleType
     }
   }
+  return ''
 }

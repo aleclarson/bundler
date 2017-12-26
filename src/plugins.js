@@ -5,14 +5,12 @@ import Plugin from './Plugin'
 
 import {traverse} from './utils'
 
-// List of plugins per file type
-const registry: { [string]: Plugin[] } = {}
+type PluginRegistry = {
+  [string]: Plugin[]
+}
 
-// Default plugins
-addPlugin(require('./JSCompiler/plugins/babel'))
-addPlugin(require('./JSCompiler/plugins/typescript'))
-addPlugin(require('./CSSCompiler/plugins/postcss'))
-addPlugin(require('./CSSCompiler/plugins/sass'))
+// List of plugins per file type
+const registry: PluginRegistry = {}
 
 export function addPlugin(plugin: mixed): void {
   if (typeof plugin == 'function') {
@@ -21,7 +19,12 @@ export function addPlugin(plugin: mixed): void {
   if (!(plugin instanceof Plugin)) {
     throw TypeError('All plugins must inherit from the `Plugin` class')
   }
-  const fileTypes: string[] = plugin.fileTypes || plugin.constructor.fileTypes
+  let fileTypes: string[]
+  if (Array.isArray(plugin.fileTypes)) {
+    fileTypes = plugin.fileTypes
+  } else {
+    fileTypes = Object.keys(plugin.fileTypes)
+  }
   for (let i = 0; i < fileTypes.length; i++) {
     const fileType = fileTypes[i]
     const plugins = registry[fileType]
@@ -39,33 +42,4 @@ export function addPlugin(plugin: mixed): void {
 
 export function getPlugins(fileType: string): Plugin[] {
   return registry[fileType] || []
-}
-
-export function getOutputType(fileType: string): string {
-  while (true) {
-    const plugins = getPlugins(fileType)
-    let outputType: ?string
-    for (let i = 0; i < plugins.length; i++) {
-      if (outputType = plugins[i].getOutputType(fileType)) {
-        fileType = outputType
-        break
-      }
-    }
-    if (!outputType) {
-      break
-    }
-  }
-  return fileType
-}
-
-export async function transformFile(code: string, file: File): Promise<string> {
-  const plugins = file.package.plugins[file.type]
-  if (plugins) {
-    await traverse(plugins, async (plugin) => {
-      if (typeof plugin.transform == 'function') {
-        code = await plugin.transform(code, file)
-      }
-    })
-  }
-  return code
 }

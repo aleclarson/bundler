@@ -4,6 +4,7 @@
   "main": "js/index",
   "dependencies": {
     "AsyncTaskGroup": "aleclarson/AsyncTaskGroup#1.1.0",
+    "SortedArray": "aleclarson/SortedArray#1.0.0",
     "fsx": "aleclarson/fsx#1.6.0",
     "glob-regex": "^0.2.0",
     "huey": "aleclarson/huey#0.1.0",

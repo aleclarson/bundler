@@ -1,5 +1,6 @@
 // @flow
 
+// TODO: Append '/index' to directory imports
 // TODO: Support namespaced deps (eg: @aleclarson/fsx)
 
 import globRegex from 'glob-regex'
@@ -10,29 +11,32 @@ import type Bundler from '../Bundler'
 import type Package from '../Package'
 import type File from '../File'
 
-export type ResolveListener =
-  (parent: Module, ref: string, dep: ?Module) => void
+type MaybeAsync<T> = T | Promise<T>
 
-export function resolveImports(
+export type ResolveListener =
+  (parent: Module, ref: string, dep: ?Module) => MaybeAsync<void>
+
+export async function resolveImports(
   mod: Module,
   bundle: Bundle,
   onResolve: ResolveListener,
-): void {
+): Promise<void> {
   const {file} = mod
-  if (file.imports) {
-    const {imports} = mod
-    file.imports.forEach((_, ref) => {
-      let dep = imports[ref]
+  const resolved = mod.imports
+  if (file.imports && resolved) {
+    const refs = file.imports.keys()
+    for (const ref of refs) {
+      let dep = resolved.get(ref)
       if (!dep) {
         const depFile = resolveImport(ref, file, bundle)
         if (depFile) {
-          imports[ref] = dep =
-            bundle.getModule(depFile) || bundle.addModule(depFile)
+          dep = bundle.getModule(depFile) || bundle.addModule(depFile)
           dep.parents.add(mod)
+          resolved.set(ref, dep)
         }
       }
-      onResolve(mod, ref, dep)
-    })
+      await onResolve(mod, ref, dep)
+    }
   }
 }
 

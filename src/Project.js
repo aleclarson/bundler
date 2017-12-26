@@ -93,14 +93,19 @@ export default class Project { /*::
     }
 
     if (main) {
+      const pkg = this.root
       const hash = [
-        path.relative(this.root.path, main.path),
+        path.relative(pkg.path, main.path),
         config.platform || '',
         config.dev ? 'dev' : '',
       ].join(':')
 
       let bundle = this.bundles[hash]
       if (!bundle) {
+        // Ensure all plugins are loaded.
+        pkg.fileTypes.forEach(fileType => pkg._loadPlugins(fileType))
+
+        // Create a new bundle.
         this.bundles[hash] =
           bundle = new Bundle({
             dev: config.dev,

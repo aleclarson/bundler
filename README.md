@@ -22,4 +22,4 @@ project.crawl({
 const code = await bundle.read()
 ```
 
-Ready to dive deeper? [Read this in-depth guide]() or view the [API documentation]().
+Ready to dive deeper? Read an [in-depth guide]() or view the [API documentation]().

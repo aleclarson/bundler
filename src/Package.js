@@ -33,7 +33,7 @@ export default class Package { /*::
   watcher: ?Watcher;
   crawled: Set<string>;
   fileTypes: Set<string>;
-  plugins: { [fileType: string]: Set<Plugin> };
+  plugins: { [fileType: string]: Plugin[] };
 */
   constructor(config: PackageConfig) {
     const {root, parent} = config
@@ -156,12 +156,12 @@ export default class Package { /*::
     if (plugins) return
 
     const outputTypes = new Set()
-    getPlugins(fileType).forEach(plugin => {
+    getPlugins(fileType).forEach((plugin: Plugin) => {
       if (plugin.loadPackage(this)) {
         if (plugins) {
-          plugins.add(plugin)
+          plugins.push(plugin)
         } else {
-          this.plugins[fileType] = new Set([ plugin ])
+          this.plugins[fileType] = [plugin]
         }
 
         // Prepare the plugin.
@@ -171,8 +171,15 @@ export default class Package { /*::
         }
 
         // Load plugins for output types.
-        const outputType = plugin.getOutputType(fileType)
-        if (outputType) outputTypes.add(outputType)
+        const {fileTypes} = plugin
+        if (fileTypes && !Array.isArray(fileTypes)) {
+          const outputType = fileTypes[fileType]
+          if (outputType) {
+            outputTypes.add(outputType)
+          } else {
+            throw Error(`Unsupported file type: '${fileType}'`)
+          }
+        }
       }
     })
 

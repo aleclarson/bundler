@@ -6,10 +6,8 @@ import fs from 'fsx'
 import type Bundle, {Module} from '../Bundle'
 import type {ResolveListener} from './resolveImports'
 
-import {forEach} from '../utils'
-import {parseImports} from './parseImports'
+import {huey} from '../logger'
 import {resolveImports} from './resolveImports'
-import {getOutputType, transformFile} from '../plugins'
 
 // Called when a module stops depending on another.
 type UnlinkListener = (mod: Module, dep: Module) => void
@@ -17,52 +15,51 @@ type UnlinkListener = (mod: Module, dep: Module) => void
 export async function loadModule(
   mod: Module,
   bundle: Bundle,
-  onResolve: ResolveListener,
-  onUnlink: UnlinkListener,
-): Promise<string> {
+  onResolve: ResolveListener = noop,
+  onUnlink: UnlinkListener = noop,
+): Promise<void> {
   const {file} = mod
 
-  // Read the module and apply any transforms.
-  const code = await transformFile(fs.readFile(file.path), file)
+  // Read the module into memory.
+  mod._body = fs.readFile(file.path)
 
-  // Keep previous imports so we can unlink removed refs.
+  // Reset the module type.
+  mod.type = file.type
+
+  // Keep previous imports so we can unlink old dependencies.
   const prevImports = file.imports
 
-  // Parse its dependencies.
-  const nextImports = parseImports(getOutputType(file.type), code)
+  // Let the compiler parse and transform the body.
+  await bundle._compiler.loadModule(mod)
 
-  // Update the file object.
-  file.imports = nextImports
-
-  // Resolve dependencies, if any exist.
-  if (nextImports && nextImports.size) {
+  const nextImports = file.imports
+  if (nextImports != prevImports) {
+    const resolved = mod.imports
 
     // Resolve new dependencies.
-    resolveImports(mod, bundle, onResolve)
+    if (nextImports) {
+      if (!resolved) mod.imports = new Map()
+      resolveImports(mod, bundle, onResolve)
 
-    // Remove old dependencies.
-    if (prevImports && prevImports.size) {
-      const resolved = mod.imports
-      forEach(resolved, (dep, ref) => {
-        if (!nextImports.has(ref)) {
-          delete resolved[ref]
-          unlink(mod, dep)
-        }
+      // Unlink old dependencies.
+      if (prevImports && resolved) {
+        resolved.forEach((dep: Module, ref: string) => {
+          if (!nextImports.has(ref)) {
+            resolved.delete(ref)
+            dep.parents.delete(mod)
+            onUnlink(mod, dep)
+          }
+        })
+      }
+    }
+
+    // Unlink old dependencies.
+    else if (prevImports && resolved) {
+      mod.imports = null
+      resolved.forEach(dep => {
+        dep.parents.delete(mod)
+        onUnlink(mod, dep)
       })
     }
   }
-
-  // Remove old dependencies.
-  else if (prevImports && prevImports.size) {
-    forEach(mod.imports, (dep) => unlink(mod, dep))
-    mod.imports = {}
-  }
-
-  // Unlink a module and an old dependency.
-  function unlink(mod: Module, dep: Module) {
-    dep.parents.delete(mod)
-    onUnlink(mod, dep)
-  }
-
-  return code
 }

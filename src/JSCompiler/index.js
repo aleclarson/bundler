@@ -7,45 +7,49 @@
 import path from 'path'
 import fs from 'fsx'
 
-import type Bundle, {Module} from '../Bundle'
 import type Package from '../Package'
+import type Bundle from '../Bundle'
 import type File from '../File'
+import Compiler from '../Compiler'
 
 import {forEach} from '../utils'
-
 import PackageMap from './PackageMap'
+import Module from '../Bundle/Module'
 
 const lineBreakRE = /\n/g
 const trimLineBreakRE = /(^\n|\n$)/g
 
-export function match(bundle: Bundle) {
-  return bundle.type == '.js'
-}
-
-export function create(bundle: Bundle) {
-  return new JSCompiler(bundle)
-}
-
-class JSCompiler { /*::
-  bundle: Bundle;
-  moduleIds: Map<Module, any>;
-  packageIds: Map<Package, string>;
-  getModuleId: (mod: Module) => any;
-  packages: ?PackageMap;
+export class JSCompiler extends Compiler { /*::
+  moduleIds: Map<Module, any>
+  packageIds: Map<Package, string>
+  getModuleId: (mod: Module) => any
+  moduleCount: number
+  packages: ?PackageMap
 */
   constructor(bundle: Bundle) {
-    this.bundle = bundle
+    super(bundle)
     this.moduleIds = new Map()
     this.packageIds = new Map()
     if (bundle.dev) {
       this.getModuleId = this._devModuleId
+      this.moduleCount = -1
       this.packages = new PackageMap(bundle.platform)
     } else {
       this.getModuleId = this._prodModuleId
+      this.moduleCount = 0
     }
   }
 
-  async compile(modules: string[], config: Object): Promise<string> {
+  static match = (bundle: Bundle) => {
+    return bundle.type == '.js'
+  }
+
+  static plugins = [
+    require('./plugins/babel'),
+    require('./plugins/typescript'),
+  ]
+
+  async joinModules(config: Object): Promise<string> {
     const {bundle} = this
     const prelude: string[] = [
       '(function() {',
@@ -66,46 +70,49 @@ class JSCompiler { /*::
     // Compute character index where modules begin.
     let outputIndex = output[0].length
 
-    for (let i = 0; i < modules.length; i++) {
-      const mod = bundle.order[i]
-      const code = await this.compileModule(modules[i], mod)
-      output.push(code)
-
-      // Track character index where each module begins.
-      mod.index = outputIndex
-      mod.length = code.length
-
-      // Increment the bundle length.
-      outputIndex += mod.length
-    }
+    let mod = bundle._first
+    do {
+      let body = mod.consume()
+      const wrapped = await this.wrapModule(body, mod)
+      if (wrapped) body = wrapped
+      output.push(body)
+      mod._index = outputIndex
+      outputIndex += mod._length = body.length
+    } while (mod = mod._next)
 
     // Kickstart the program.
-    const main = bundle.order[0]
-    const mainId = JSON.stringify(this.moduleIds.get(main))
-    output.push(`\n  require(${mainId});\n})()`)
+    const mainId = this.moduleIds.get(bundle._first)
+    output.push('\n  require(' + JSON.stringify(mainId) + ');\n})()')
 
-    // All done!
+    // Become one with the universe.
     return output.join('')
   }
 
-  addModule(mod: Module): void {
+  createModule(file: File): Module {
+    const mod = new Module(file)
     this.moduleIds.set(mod, this.getModuleId(mod))
     if (this.packages) this.packages.addModule(mod)
+    return mod
+  }
+
+  async loadModule(mod: Module): Promise<void> {
+    await this.transform(mod)
+    this.parseImports(mod)
   }
 
   // The resulting code is indented with 2 spaces.
-  async compileModule(code: string, mod: Module): Promise<string> {
+  wrapModule(body: string, mod: Module): string {
     let id: any = this.moduleIds.get(mod)
     if (typeof id == 'string') id = `'${id}'`
 
     // Replace import paths with module IDs.
-    code = replaceImportPaths(mod, code, this.moduleIds)
+    const output = replaceImportPaths(mod, body, this.moduleIds)
 
     // Define the module for the `require` polyfill.
     return [
       '',
       '  __d(' + id + ', function(module, exports) {',
-           indentLines(code, 2),
+           indentLines(output, 2),
       '  })',
       '',
     ].join('\n')
@@ -115,7 +122,7 @@ class JSCompiler { /*::
     if (this.moduleIds.delete(mod)) {
       const map = this.packages
       if (map) {
-        const pkg = mod.file.package
+        const pkg = mod.package
         const mods = map.getModules(pkg)
         if (mods && mods.length > 1) {
           mods.splice(mods.indexOf(mod), 1)
@@ -124,24 +131,24 @@ class JSCompiler { /*::
         }
       }
     } else {
-      throw Error(`Module not in bundle: '${mod.file.path}'`)
+      throw Error(`Module not in bundle: '${mod.path}'`)
     }
   }
 
   // Simple number IDs in production.
   _prodModuleId(mod: Module) {
-    return this.bundle.order.length
+    return ++this.moduleCount
   }
 
   // String IDs for easier debugging.
   _devModuleId(mod: Module) {
     const map: PackageMap = (this.packages: any)
-    const pkg = mod.file.package
+    const pkg = mod.package
     const pkgId = this._getPackageId(pkg, map)
 
     let moduleId = pkgId
     if (mod.file != map.getMain(pkg)) {
-      const fileId = path.relative(pkg.path, mod.file.path)
+      const fileId = path.relative(pkg.path, mod.path)
       if (fileId.endsWith('/index.js')) {
         moduleId += '/' + path.dirname(fileId)
       } else {
@@ -180,14 +187,15 @@ class JSCompiler { /*::
       this.packageIds.set(pkg, nextId)
       map.getModules(pkg).forEach(mod => {
         this.moduleIds.set(mod, this.getModuleId(mod))
-        if (bundle.hasCompiled && !mod.isDeleted) {
-          bundle.missing.delete(mod)
-          bundle.changed.add(mod)
+        if (bundle._canPatch && mod._status < 0) {
+          mod._status = 1
+          bundle._changes.add(mod)
 
-          // Force parents to resolve this module again.
+          // Force parents to update their imports.
           mod.parents.forEach(parent => {
-            bundle.changed.add(parent)
-            parent.unlink(mod)
+            parent._unlink(mod)
+            parent._status = 1
+            bundle._changes.add(parent)
           })
         }
       })
@@ -232,7 +240,7 @@ function renderGlobals(globals: ?Object, dev: boolean): string {
 
 function readPolyfill(file: string): string {
   if (!path.isAbsolute(file)) {
-    file = require.resolve('../../../polyfills/' + file)
+    file = require.resolve('../../polyfills/' + file)
   }
   return indentLines(fs.readFile(file), 1) + '\n'
 }
@@ -242,13 +250,13 @@ function replaceImportPaths(
   input: string,
   moduleIds: Map<Module, string>
 ): string {
-  const {imports} = mod.file
-  if (imports) {
-    // The `mod.imports` object isn't sorted because refs are resolved
-    // asynchronously. We can avoid unnecessary string operations if
-    // we sort the imports using a sparse array.
+  const imports = mod.file.imports
+  const resolved = mod.imports
+  if (imports && resolved) {
+    // The `mod.imports` map isn't sorted by default, so we
+    // sort it with a sparse array to improve efficiency.
     const sorted = []
-    forEach(mod.imports, (dep, ref) => {
+    resolved.forEach((dep, ref) => {
       const match: any = imports.get(ref)
       sorted[match.index] = {ref, mod: dep}
     })

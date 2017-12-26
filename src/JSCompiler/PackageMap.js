@@ -82,10 +82,8 @@ export default class PackageMap { /*::
     }
   }
 
-  // The module's package is lazily created in here.
   addModule(mod: Module): void {
-    const pkg = mod.file.package
-    const mods = this.modules.get(pkg)
+    const mods = this.modules.get(mod.package)
     if (mods) mods.push(mod)
   }
 }

@@ -2,12 +2,16 @@
 
 import path from 'path'
 
-import type {Import} from './Bundle/parseImports'
 import type Package from './Package'
 
 const platformRE = /\.(android|ios|web)$/
 
 export type Platform = 'android' | 'ios' | 'web'
+
+export type Import = {
+  line: number,
+  index: number,
+}
 
 export default class File { /*::
   path: string;

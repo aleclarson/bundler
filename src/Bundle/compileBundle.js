@@ -4,14 +4,9 @@
 
 import AsyncTaskGroup from 'AsyncTaskGroup'
 import noop from 'noop'
-import path from 'path'
-import fs from 'fsx'
 
-import type Bundle, {Module} from '.'
-import type File from '../File'
+import type Bundle, {Module} from '../Bundle'
 
-import {uhoh, forEach} from '../utils'
-import {transformFile} from '../plugins'
 import {loadModule} from './loadModule'
 
 type CompilerConfig = {
@@ -23,18 +18,16 @@ export async function compileBundle(
   bundle: Bundle,
   config: CompilerConfig,
 ): Promise<string> {
-  const {compiler} = bundle
+  const main = bundle.getModule(bundle.main)
+  if (!main) throw Error('Missing main module')
 
   let stopped = false
   config.onStop(function() {
     stopped = true
   })
 
-  // Wait for plugins to initialize.
-  await nextTick()
-
-  // The code of every module goes here.
-  const modules: string[] = []
+  // Track which module was last added.
+  let prev = main
 
   // Module refs that cannot be resolved.
   const missing = new Map()
@@ -42,19 +35,38 @@ export async function compileBundle(
   // Load one module at a time.
   const loading = new AsyncTaskGroup(1)
 
-  // Prevent duplicate modules.
-  const deps: Set<Module> = new Set()
-
-  // Start with the `main` module.
-  const main = bundle.getModule(bundle.main)
-  if (main) {
-    deps.add(main)
-    onRead(await loadModule(main, bundle, onResolve, noop), main)
+  // Add resolved dependencies to the bundle.
+  function onResolve(parent: Module, ref: string, dep: ?Module) {
+    if (stopped) return
+    if (dep) {
+      const mod = dep
+      if (mod._status == 201) {
+        mod._status = 200
+        prev = prev._next = mod
+        loading.push(async () => {
+          if (stopped) return
+          await loadModule(mod, bundle, onResolve)
+        })
+      }
+    }
+    else if (parent._status == 404) {
+      // $FlowFixMe
+      missing.get(parent).add(ref)
+    }
+    else {
+      parent._status = 404
+      bundle._changes.add(parent)
+      missing.set(parent, new Set([ref]))
+    }
   }
+
+  // Start with the main module.
+  await loadModule(main, bundle, onResolve)
 
   // Wait for all modules to load...
   await loading.push(noop).promise
 
+  // TODO: Salvage any work that was done?
   if (stopped) {
     bundle.reset()
     return ''
@@ -65,59 +77,12 @@ export async function compileBundle(
     bundle.events.emit('missing', missing)
   }
 
-  if (!modules.length) {
-    throw uhoh('Bundle has no modules', 'EMPTY_BUNDLE')
-  }
+  // Cache the final module.
+  bundle._final = prev
 
-  // Mark the compilation as completed.
-  bundle.hasCompiled = true
+  // The bundle is now considered patchable.
+  bundle._canPatch = true
 
-  // Let the compiler take it from here.
-  return compiler.compile(modules, config)
-
-  function onRead(code: string, mod: Module) {
-    if (stopped) return
-    modules.push(code)
-    bundle.order.push(mod)
-    compiler.addModule(mod)
-  }
-
-  function onResolve(parent: Module, ref: string, dep: ?Module) {
-    if (stopped) return
-    if (dep) {
-      const {size} = deps
-      deps.add(dep)
-      if (deps.size == size) {
-        return // Module already in the bundle.
-      }
-
-      const mod = dep
-      const {file} = mod
-      if (file.imports) {
-        loading.push(async () => {
-          if (stopped) return
-          const code = await transformFile(fs.readFile(file.path), file)
-          forEach(mod.imports, (dep, ref) => onResolve(mod, ref, dep))
-          onRead(code, mod)
-        })
-      } else {
-        loading.push(async () => {
-          if (stopped) return
-          const code = await loadModule(mod, bundle, onResolve, noop)
-          onRead(code, mod)
-        })
-      }
-    } else {
-      let refs = missing.get(parent)
-      if (!refs) {
-        missing.set(parent, refs = new Set)
-        bundle.missing.add(parent)
-      }
-      refs.add(ref)
-    }
-  }
-}
-
-function nextTick() {
-  return new Promise(resolve => setImmediate(resolve))
+  // The compiler handles the rest.
+  return bundle._compiler.joinModules(config)
 }

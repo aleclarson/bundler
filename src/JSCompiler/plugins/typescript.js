@@ -8,7 +8,7 @@ import path from 'path'
 import fs from 'fsx'
 
 import type Package from '../../Package'
-import type File from '../../File'
+import type Module from '../../Bundle/Module'
 import Plugin from '../../Plugin'
 
 const loadModule = (require: any)
@@ -16,11 +16,7 @@ const loadModule = (require: any)
 let ts: any
 
 class TypeScriptPlugin extends Plugin {
-  static fileTypes = ['.ts']
-
-  getOutputType(fileType: string) {
-    return '.js'
-  }
+  static fileTypes = {'.ts': '.js'}
 
   load() {
     ts = loadModule('typescript')
@@ -35,9 +31,9 @@ class TypeScriptPlugin extends Plugin {
     return false
   }
 
-  transform(code: string, file: File): string {
-    const config = file.package.meta._tsconfig
-    return ts.transpileModule(code, config)
+  transform(mod: Module, pkg: Package) {
+    mod._body = ts.transpileModule(mod._body, pkg.meta._tsconfig)
+    mod.type = '.js'
   }
 }
 

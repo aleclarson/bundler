@@ -43,8 +43,8 @@ export async function readBundle(
     }
   }
 
-  const cached = bundle.promise != null
-  if (!cached && bundle.hasCompiled) {
+  const cached = bundle._promise != null
+  if (!cached && bundle._canPatch) {
     utils.clearTerminal()
   }
 
@@ -59,7 +59,7 @@ export async function readBundle(
     log('')
     missing.forEach((refs, mod) => {
       const {imports} = mod.file
-      const name = path.relative(root, mod.file.path)
+      const name = path.relative(root, mod.path)
       refs.forEach(ref => {
         const line = huey.gray(`:${1 + imports[ref].line}`)
         log(`  ~/${name}${line} ` + huey.red('➤ ' + ref))

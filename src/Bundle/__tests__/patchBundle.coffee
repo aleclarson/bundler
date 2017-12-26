@@ -1,5 +1,4 @@
 
-mutate = require "mutate"
 path = require "path"
 noop = require "noop"
 tp = require "testpass"
@@ -8,22 +7,39 @@ vm = require "vm"
 huey = require "huey"
 log = require "timber"
 
-root = path.resolve __dirname, "../__fixtures__/example"
-fs = require("fsx-mock").install root
-
 Bundler = require "../../Bundler"
 bundler = new Bundler()
+
+root = path.resolve __dirname, "../__fixtures__/project"
+main = "index.js"
 
 project = bundler.project {root}
 project.crawl()
 
-main = "index.web.js"
-bundle = null
-
 tp.header "patchBundle()"
+tp.focus()
 
-tp.beforeEach -> resetBundle()
-tp.afterEach -> fs.reset()
+fs = null
+tp.beforeAll ->
+  fs = require("fsx-mock").install root
+
+bundle = null
+tp.beforeEach ->
+
+  # Start with an empty main module.
+  writeModule main
+
+  bundle = project.bundle
+    dev: true
+    main: main
+    platform: "web"
+
+  await runBundle()
+  if bundle.modules.length isnt 1
+    throw Error "Bundle was not reset properly"
+
+tp.afterEach ->
+  fs.reset()
 
 # These tests use the same bundle.
 tp.group ->
@@ -160,7 +176,11 @@ tp.group ->
     fs.writeFile "node_modules/z/index.js"
 
     await readBundle()
-    t.eq getModuleIds(), ["example", "x", "z@1.0.0", "z@2.0.0"]
+    t.eq getModuleIds(), ["project", "x", "z@1.0.0", "z@2.0.0"]
+
+  # The goal here is to ensure renamed packages are always reloaded,
+  # even if they were reloaded earlier in the same patch.
+  tp.xtest "add duplicate package after the other package was patched", (t) ->
 
   # NOTE: This test does not currently pass.
   tp.xtest "change package version", (t) ->
@@ -172,13 +192,13 @@ tp.group ->
     writeModule jsonPath, JSON.stringify(json, null, 2)
 
     await runBundle()
-    t.eq getModuleIds(), ["example", "x", "z@1.2.3", "z@2.0.0"]
+    t.eq getModuleIds(), ["project", "x", "z@1.2.3", "z@2.0.0"]
 
   tp.test "remove package with same name as another package", (t) ->
     writeModule "node_modules/x/index.js"
 
     await runBundle()
-    t.eq getModuleIds(), ["example", "x", "z"]
+    t.eq getModuleIds(), ["project", "x", "z"]
 
 tp.test "add package with same name & version as another package", (t) ->
   writeModule main, "require('x'); require('z')"
@@ -187,25 +207,11 @@ tp.test "add package with same name & version as another package", (t) ->
 
   await readBundle()
   t.eq bundle.missing.size, 0
-  t.eq getModuleIds(), ["example", "x", "z", "y"]
+  t.eq getModuleIds(), ["project", "x", "z", "y"]
 
 #
 # Helpers
 #
-
-resetBundle = ->
-  fs.reset()
-
-  # Start with an empty main module.
-  writeModule main, ""
-
-  bundle = project.bundle
-    dev: true
-    platform: "web"
-
-  await runBundle()
-  if bundle.order.length isnt 1
-    throw Error "Bundle was not reset properly"
 
 readBundle = ->
   bundle.read {onStop: noop}
@@ -222,18 +228,15 @@ runBundle = (ctx = {}) ->
   return ctx
 
 getModuleName = (mod) ->
-  bundle.relative mod.file.path
+  bundle.relative mod.path
 
 getModuleNames = ->
-  bundle.order.map getModuleName
+  bundle.modules.map getModuleName
 
 getModuleIds = ->
   {compiler} = bundle
-  bundle.order.map (mod) ->
+  bundle.modules.map (mod) ->
     compiler.moduleIds.get mod
-
-getChangedNames = ->
-  Array.from(bundle.changed).map getModuleName
 
 writeModule = (name, code) ->
   file = path.resolve root, name

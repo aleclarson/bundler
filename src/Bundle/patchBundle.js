@@ -1,257 +1,291 @@
 // @flow
 
 // TODO: Allow `patchBundle` to be stopped when it's loading new modules?
+// TODO: Insert new modules under their highest consumer?
+// TODO: Group modules by package?
 
 import AsyncTaskGroup from 'AsyncTaskGroup'
 import path from 'path'
 import noop from 'noop'
 
-import type Bundle, {Module} from '.'
+import type Bundle, {Module, Patcher} from '../Bundle'
 
 import {forEach, traverse} from '../utils'
 import {resolveImports} from './resolveImports'
 import {loadModule} from './loadModule'
 
 export async function patchBundle(
- bundle: Bundle,
- config: Object,
+  bundle: Bundle,
+  config: Object,
 ): Promise<string> {
- if (!bundle.promise) {
-   throw Error('Must call `compileBundle` before `patchBundle`')
- }
- const input = await bundle.promise
- if (input) {
-   const patch = await createPatch(bundle)
-   return applyPatch(input, patch, bundle)
- }
- return ''
+  const patcher = bundle._compiler.createPatcher(config)
+  const patch = await createPatch(bundle, patcher)
+  return applyPatch(patch, bundle, patcher)
 }
+
+//
+// Internal
+//
 
 type Patch = {
- added: Change[],
- changes: Change[],
-}
-type Change = {
- mod: Module,
- code: string,
- index: number,
+  splices: Module[],
+  inserts: Module[],
+  appends: Module[],
 }
 
-// Create a bundle patch using the bundle's change/delete queue.
-async function createPatch(bundle: Bundle): Promise<Patch> {
- const {compiler, order} = bundle
+async function createPatch(
+  bundle: Bundle,
+  patcher: Patcher,
+): Promise<Patch> {
+  const compiler = bundle._compiler
 
- // Prevent duplicate modules.
- const deps = new Set(order)
+  const patch: Patch = {
+    splices: [],
+    inserts: [],
+    appends: [],
+  }
 
- // Modules added by the patch.
- const added: Change[] = []
+  // Module refs that cannot be resolved.
+  const missing: Map<Module, Set<string>> = new Map()
 
- // Sparse array of changes (in order).
- const changes: Change[] = []
+  let changes = bundle._changes
+  while (changes.size) {
 
- // Module refs that cannot be resolved.
- const missing: Map<Module, Set<string>> = new Map
+    // Load one module at a time.
+    var loading = new AsyncTaskGroup(1)
 
- let loading
- if (bundle.missing.size) {
-   loading = new AsyncTaskGroup(1)
-   await traverse(bundle.missing, async (mod) => {
-     resolveImports(mod, bundle, onResolve)
-   })
-   bundle.missing.clear()
+    bundle._changes = new Set()
+    await traverse(changes, async (mod) => {
+      const status = mod._status
+      if (status == 404) {
+        await resolveImports(mod, bundle, onResolve)
+      } else {
+        const index = patcher.indexOf(mod)
+        patch.splices[index] = mod
+        if (status > 0) {
+          await loadModule(mod, bundle, onResolve, onUnlink)
+        } else {
+          deleteModule(mod)
+        }
+      }
+    })
 
-   // Wait for new modules to be loaded.
-   await loading.push(noop).promise
- }
+    // Wait for new modules to load...
+    await loading.push(noop).promise
 
- while (bundle.changed.size) {
-   loading = new AsyncTaskGroup(1)
-   await traverse(bundle.changed, async (mod) => {
-     const code = await loadModule(mod, bundle, onResolve, onUnlink)
-     const modIndex = order.indexOf(mod)
-     changes[modIndex] = {mod, code, index: mod.index}
-   })
-   bundle.changed.clear()
+    // Process any further changes (like a renamed package).
+    changes = bundle._changes
+  }
 
-   // Wait for new modules to be loaded, which may rename a package.
-   await loading.push(noop).promise
- }
+  // Emit any unresolved refs.
+  if (missing.size) {
+    bundle.events.emit('missing', missing)
+  }
 
- if (bundle.deleted.size) {
-   bundle.deleted.forEach(deleteModule)
-   bundle.deleted.clear()
- }
+  // The patch is ready to go!
+  return patch
 
- // Emit any unresolved refs.
- if (missing.size) {
-   bundle.events.emit('missing', missing)
- }
+  function deleteModule(mod: Module) {
+    compiler.deleteModule(mod)
 
- return {
-   added,
-   changes: desparse(changes),
- }
+    // Reconstruct this module if ever used again.
+    bundle._map.delete(mod.file)
 
- function deleteModule(mod: Module) {
-   compiler.deleteModule(mod)
+    // Unlink parents from this module.
+    mod.parents.forEach(parent => parent._unlink(mod))
 
-   const modIndex = order.indexOf(mod)
-   changes[modIndex] = {mod, code: '', index: mod.index}
+    // Remove this module as a parent of any dependencies.
+    if (mod.imports) {
+      mod.imports.forEach(dep => {
+        dep.parents.delete(mod)
+        onUnlink(mod, dep)
+      })
+    }
+  }
 
-   // From here on out, this module must be recreated if ever used again.
-   bundle.map.delete(mod.file)
+  // One module stopped using another.
+  function onUnlink(mod: Module, dep: Module) {
+    if (!dep.parents.size) {
+      bundle._deleteModule(dep)
+    }
+  }
 
-   // Unlink parents from this module.
-   mod.parents.forEach(parent => parent.unlink(mod))
-
-   // Remove this module as a parent of any dependencies.
-   if (mod.file.imports) {
-     forEach(mod.imports, (dep) => {
-       dep.parents.delete(mod)
-       onUnlink(mod, dep)
-     })
-   }
- }
-
- // One module stopped using another.
- function onUnlink(mod: Module, dep: Module) {
-   if (!dep.parents.size) {
-     dep.isDeleted = true
-     deleteModule(dep)
-     deps.delete(dep)
-   }
- }
-
- // Some module's import ref has been resolved into a module.
- function onResolve(parent: Module, ref: string, dep: ?Module) {
-   if (dep) {
-     const {size} = deps
-     deps.add(dep)
-     if (deps.size == size) {
-       return // Module already in the bundle.
-     }
-
-     const mod = dep
-     if (mod.isDeleted) {
-       mod.isDeleted = undefined
-     } else {
-       compiler.addModule(mod)
-     }
-     loading.push(async () => {
-       const code = await loadModule(mod, bundle, onResolve, noop)
-       added.push({mod, code, index: -1})
-     })
-   } else {
-     let refs = missing.get(parent)
-     if (!refs) {
-       missing.set(parent, refs = new Set)
-       bundle.missing.add(parent)
-     }
-     refs.add(ref)
-   }
- }
-}
-
-function desparse<T>(sparse: T[]): T[] {
- const array = []
- sparse.forEach(value => array.push(value))
- return array
+  // Some module's import ref has been resolved into a module.
+  function onResolve(parent: Module, ref: string, dep: ?Module) {
+    if (dep) {
+      const mod = dep
+      if (mod._status > 0) {
+        // Module already in the bundle.
+        if (mod._status != 201) return
+        mod._status = 200
+      } else {
+        // In case a changed module was unlinked before being patched,
+        // we must reload modules that are unlinked and then added back
+        // in the same patch.
+        mod._status = 1
+      }
+      loading.push(async () => {
+        await loadModule(mod, bundle, onResolve)
+        if (mod._index < 0) {
+          patch.appends.push(mod)
+        } else {
+          patch.inserts.push(mod)
+        }
+      })
+    } else {
+      let refs = missing.get(parent)
+      if (!refs) {
+        parent._status = 404
+        missing.set(parent, refs = new Set)
+      }
+      refs.add(ref)
+    }
+  }
 }
 
 // Transform the input string using the changes array.
 async function applyPatch(
- input: string,
- patch: Patch,
- bundle: Bundle,
+  patch: Patch,
+  bundle: Bundle,
+  patcher: Patcher,
 ): Promise<string> {
- const {added, changes} = patch
- const {compiler, order} = bundle
+  const compiler = bundle._compiler
+  const {splices, inserts, appends} = patch
 
- // Our position in the input string.
- let inputIndex = 0
+  // The patcher can decide which payload needs patching.
+  const input = await compiler.loadInput()
 
- // The bundle is rebuilt with slices of new and old code.
- const output = []
+  // The bundle is rebuilt with slices of new and old code.
+  const output = []
 
- const replaceModule = async (code: string, mod: Module, index: number) => {
-   code = await compiler.compileModule(code, mod)
+  // Remember where the final module ends (before the patch).
+  const endIndex = bundle._final._endIndex
 
-   const prevLength = mod.length
-   mod.length = code.length
+  // The character index of `input` that hasn't been spliced.
+  let inputIndex = 0
 
-   const modIndex = order.indexOf(mod)
-   shiftModules(order, mod.length - prevLength, modIndex + 1)
+  // The array of inserted modules is processed in tandem
+  // with the array of changed/deleted modules.
+  let insertIndex = 0
 
-   output.push(input.slice(inputIndex, index), code)
-   inputIndex = index + prevLength
- }
+  // The input is spliced for replacing, deleting, and inserting modules.
+  if (splices.length) {
+    for (const i in (splices: any)) {
+      const index = Number(i)
 
- const deleteModule = (mod: Module, index: number) => {
-   const modIndex = order.indexOf(mod)
-   shiftModules(order, 0 - mod.length, modIndex + 1)
-   order.splice(modIndex, 1)
+      // Insert any modules before the next splice.
+      await insertModules(index)
 
-   output.push(input.slice(inputIndex, index))
-   inputIndex = index + mod.length
- }
+      // Salvage any unchanged input.
+      if (inputIndex < index) {
+        output.push(input.slice(inputIndex, index))
+      }
 
- // After adding modules to the bundle, the remaining input code is
- // appended to the output array. To do that, we need to know where
- // the last module ended before the patch was applied.
- let last = order[order.length - 1]
- let addIndex = last.index + last.length
+      // Perform the next splice.
+      const mod = splices[index]
+      if (mod._status < 0) {
+        deleteModule(mod, index)
+      } else {
+        await replaceModule(mod, index)
+      }
+    }
+  }
 
- for (let i = 0; i < changes.length; i++) {
-   const change = changes[i]
-   if (change.mod.isDeleted) {
-     deleteModule(change.mod, change.index)
-   } else {
-     await replaceModule(change.code, change.mod, change.index)
-   }
- }
+  // Perform any remaining insertions.
+  await insertModules(Infinity)
 
- if (added.length) {
-   // Include any code between the last changed
-   // (or deleted) module and the first new module.
-   if (inputIndex < addIndex) {
-     output.push(input.slice(inputIndex, addIndex))
-     inputIndex = addIndex
-   }
+  if (appends.length) {
+    // Salvage any unchanged input between
+    // the last splice and the first append.
+    if (inputIndex < endIndex) {
+      output.push(input.slice(inputIndex, endIndex))
+      inputIndex = endIndex
+    }
 
-   // To ensure new modules have correct indexes, we need to
-   // know where the last module ends in the patched bundle.
-   last = order[order.length - 1]
-   addIndex = last.index + last.length
+    // To append a module, we need to know where the
+    // final module ends within the patched bundle.
+    let appendIndex = bundle._final._endIndex
 
-   for (let i = 0; i < added.length; i++) {
-     let {mod, code} = added[i]
-     code = await compiler.compileModule(code, mod)
+    for (let i = 0; i < appends.length; i++) {
+      const mod = appends[i]
 
-     mod.index = addIndex
-     addIndex += mod.length = code.length
+      let body = mod.consume()
+      const wrapped = await compiler.wrapModule(body, mod)
+      if (wrapped) body = wrapped
+      output.push(body)
 
-     output.push(code)
-     order.push(mod)
-   }
- }
+      mod._index = appendIndex
+      appendIndex += mod._length = body.length
+    }
+  }
 
- // Include any remaining code.
- output.push(input.slice(inputIndex))
+  // Salvage any unchanged input.
+  if (inputIndex < input.length) {
+    output.push(input.slice(inputIndex))
+  }
 
- // Return the patched bundle.
- return output.join('')
-}
+  // Return the patched bundle.
+  return output.join('')
 
-// Shift each module's character index by a specific amount.
-function shiftModules(
- modules: Module[],
- amount: number,
- startIndex: number,
-): void {
- if (amount != 0) {
-   for (let i = startIndex; i < modules.length; i++) {
-     modules[i].index += amount
-   }
- }
+  // Perform insertions until `beforeIndex` is reached.
+  async function insertModules(beforeIndex: number) {
+    let mod = inserts[insertIndex]
+    let prevIndex = -1
+    while (mod && mod._index <= beforeIndex) {
+      const index = mod._index
+
+      // Salvage any unchanged input.
+      if (inputIndex < index) {
+        output.push(input.slice(inputIndex, index))
+      }
+
+      // When multiple modules are inserted at the same index,
+      // we need to ensure module boundaries are correct.
+      if (index == prevIndex) {
+        var prev = inserts[insertIndex - 1]
+        mod._index = prev._endIndex
+      }
+
+      // Insert the module into the linked list.
+      patcher.insertModule(mod, prev)
+
+      // Push the module code onto the output array.
+      await replaceModule(mod, index)
+      prevIndex = index
+
+      // Continue until all insertions before
+      // the given `index` have been performed
+      mod = inserts[insertIndex += 1]
+    }
+  }
+
+  // This also works for inserting a module.
+  async function replaceModule(mod: Module, index: number) {
+    let body = mod.consume()
+    const wrapped = await compiler.wrapModule(body, mod)
+    if (wrapped) body = wrapped
+    output.push(body)
+
+    const prevLength = mod._length
+    mod._length = body.length
+
+    // Tell the patcher to update module boundaries.
+    patcher.shiftModules(mod, mod._length - prevLength)
+
+    // Exclude the module's old code.
+    inputIndex = index + prevLength
+  }
+
+  function deleteModule(mod: Module, index: number) {
+    const length = mod._length
+
+    // Tell the patcher to update module boundaries.
+    patcher.shiftModules(mod, 0 - length)
+
+    // Tell the patcher to unlink this module.
+    patcher.deleteModule(mod)
+
+    // Tell the splicer to ignore this module.
+    inputIndex = index + length
+  }
 }
