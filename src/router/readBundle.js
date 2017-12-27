@@ -43,8 +43,8 @@ export async function readBundle(
     }
   }
 
-  const cached = bundle.promise != null
-  if (!cached && bundle.hasCompiled) {
+  const wasCached = bundle.isCached
+  if (wasCached) {
     utils.clearTerminal()
   }
 
@@ -59,7 +59,7 @@ export async function readBundle(
     log('')
     missing.forEach((refs, mod) => {
       const {imports} = mod.file
-      const name = path.relative(root, mod.file.path)
+      const name = path.relative(root, mod.path)
       refs.forEach(ref => {
         const line = huey.gray(`:${1 + imports[ref].line}`)
         log(`  ~/${name}${line} ` + huey.red('➤ ' + ref))
@@ -77,7 +77,7 @@ export async function readBundle(
     let code = await bundle.read((config: Object))
     if (missed) {
       code = `throw Error('Bundle failed. Please check your terminal.')`
-    } else if (code && !cached) {
+    } else if (code && !wasCached) {
       const elapsed = huey.cyan(utils.getElapsed(started))
       const name = huey.green('~/' + bundle.main.name)
       log(`📦 Bundled ${name} in ${elapsed}`)

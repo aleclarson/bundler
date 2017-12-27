@@ -9,7 +9,7 @@ import path from 'path'
 import fs from 'fsx'
 
 import type Package from '../../Package'
-import type File from '../../File'
+import type Module from '../../Bundle/Module'
 import Plugin from '../../Plugin'
 
 import {forEach} from '../../utils'
@@ -42,9 +42,8 @@ class BabelPlugin extends Plugin {
     return false
   }
 
-  transform(code: string, file: File): string {
-    const config = file.package.meta.babel
-    return babel.transform(code, config).code
+  transform(mod: Module, pkg: Package) {
+    mod._body = babel.transform(mod._body, pkg.meta.babel).code
   }
 }
 

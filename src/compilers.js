@@ -1,37 +1,34 @@
 // @flow
 
 import type Bundle, {Module} from './Bundle'
+import type Compiler from './Compiler'
 import type Package from './Package'
 
-export interface Compiler {
-  bundle: Bundle;
-  compile(modules: string[], config: Object): string | Promise<string>;
-  addModule(mod: Module): void;
-  compileModule(code: string, mod: Module): string | Promise<string>;
-  deleteModule(mod: Module): void;
+import {addPlugin} from './plugins'
+
+const compilers: Class<Compiler>[] = []
+
+// Built-in compilers
+import {JSCompiler} from './JSCompiler'
+import {CSSCompiler} from './CSSCompiler'
+
+addCompiler(JSCompiler)
+addCompiler(CSSCompiler)
+
+export function addCompiler(compiler: Class<Compiler>): void {
+  if (compiler.plugins) {
+    compiler.plugins.forEach(addPlugin)
+  }
+  compilers.push(compiler)
 }
 
-export interface CompilerType {
-  match(bundle: Bundle): boolean;
-  create(bundle: Bundle): Object;
-}
-
-const compilers: CompilerType[] = [
-  require('./JSCompiler'),
-]
-
-// Create an object where the compiler is the prototype.
-// Use this object to compile the associated bundle.
 export function loadCompiler(bundle: Bundle): Compiler {
-  for (let i = 0; i < compilers.length; i++) {
-    const compiler = compilers[i]
+  let index = compilers.length
+  while (--index >= 0) {
+    const compiler = compilers[index]
     if (compiler.match(bundle)) {
-      return compiler.create(bundle)
+      return new compiler(bundle)
     }
   }
   throw Error(`No compiler for bundle: '${bundle.main.path}'`)
-}
-
-export function addCompiler(compiler: CompilerType): void {
-  compilers.push(compiler)
 }

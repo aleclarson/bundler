@@ -14,6 +14,9 @@ import File from './File'
 
 const homedir = require('os').homedir()
 
+// Initialize compilers for tests.
+require('./compilers')
+
 export default class Bundler { /*::
   files: { [filePath: string]: File };
   packages: { [root: string]: Package };

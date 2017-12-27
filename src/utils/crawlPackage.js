@@ -34,11 +34,6 @@ export function crawlPackage(pkg: Package, config: CrawlOptions = {}): void {
   // Start at package root, or the given sub-directory.
   deeper(path.join(pkg.path, config.root || ''))
 
-  // Load plugins for this package.
-  setImmediate(() => {
-    pkg.fileTypes.forEach(fileType => pkg._loadPlugins(fileType))
-  })
-
   // Crawl a directory recursively.
   function deeper(dir: string): void {
     const hash = path.relative(pkg.path, dir) + suffix
