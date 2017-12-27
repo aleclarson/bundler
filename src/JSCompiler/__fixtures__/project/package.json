@@ -1,0 +1,15 @@
+{
+  "name": "project",
+  "version": "0.0.1",
+  "dependencies": {
+    "noop": "aleclarson/noop#0.0.1",
+    "x": "0.0.1",
+    "z": "1.0.0"
+  },
+  "devDependencies": {
+    "flow-bin": "^0.59.0"
+  },
+  "babel": {
+    "presets": ["flow", "es2015"]
+  }
+}
