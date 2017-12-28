@@ -46,14 +46,14 @@ export default class Compiler { /*::
   //
 
   parseImports(mod: Module): void {
-    if (!mod._body) {
+    if (mod._body == null) {
       throw Error('Cannot parse module until its code is loaded')
     }
     mod.file.imports = parseImports(mod.type, mod._body)
   }
 
   async transform(mod: Module): Promise<void> {
-    if (!mod._body) {
+    if (mod._body == null) {
       throw Error('Cannot transform module until its code is loaded')
     }
     const pkg = mod.package

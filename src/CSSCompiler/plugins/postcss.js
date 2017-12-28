@@ -7,6 +7,8 @@ import type Package from '../../Package'
 import type File from '../../File'
 import Plugin from '../../Plugin'
 
+import {log, huey} from '../../logger'
+
 const loadModule = (require: any)
 
 class PostCssPlugin extends Plugin {
@@ -40,10 +42,13 @@ class PostCssPlugin extends Plugin {
     return false
   }
 
-  async transform(code: string, file: File): Promise<string> {
-    const postcss = file.package.meta._postcss
-    const config = {from: file.path}
-    return (await postcss.process(code, config)).css
+  async transform(data: string, pkg: Package): Promise<string> {
+    const postcss = pkg.meta._postcss
+    const result = await postcss.process(data)
+    result.warnings().forEach(warning => {
+      log.warn(warning.toString())
+    })
+    return result.css
   }
 }
 

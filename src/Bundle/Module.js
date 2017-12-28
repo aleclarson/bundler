@@ -36,7 +36,7 @@ export default class Module { /*::
 
   read(): string {
     const body = this._body
-    if (body) return body
+    if (body != null) return body
     throw Error('Module must be loaded before reading')
   }
 

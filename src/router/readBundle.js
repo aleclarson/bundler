@@ -79,7 +79,7 @@ export async function readBundle(
       code = `throw Error('Bundle failed. Please check your terminal.')`
     } else if (code && !wasCached) {
       const elapsed = huey.cyan(utils.getElapsed(started))
-      const name = huey.green('~/' + bundle.main.name)
+      const name = huey.green('~/' + bundle._main.name)
       log(`📦 Bundled ${name} in ${elapsed}`)
     }
     return {status: 200, code}

@@ -1,32 +1,36 @@
 // @flow
 
-// TODO: Install `node-sass` lazily
 // TODO: Source map support
+// TODO: Load `node-sass` version specified by each package?
 
-import type File from '../../File'
+import type Package from '../../Package'
+import type Module from '../../Bundle/Module'
+
+import {lazyRequire} from '../../utils/lazyRequire'
 import Plugin from '../../Plugin'
-
-const loadModule = (require: any)
 
 let sass: any
 
 class SassPlugin extends Plugin {
-  static fileTypes = ['.scss', '.sass']
-
-  getOutputType(fileType: string) {
-    return '.css'
+  static fileTypes = {
+    '.scss': '.css',
+    '.sass': '.css',
   }
 
-  load() {
-    sass = loadModule('node-sass')
+  async load() {
+    sass = await lazyRequire('node-sass')
   }
 
-  transform(code: string, file: File): Promise<string> {
+  transform(input: string, config: Object = {}): Promise<string> {
     return new Promise((resolve, reject) => {
       sass.render({
-        data: code,
-        file: file.path,
-      }, (error: Error, result: {css: string}) => {
+        data: input,
+        file: config.file,
+        linefeed: config.linefeed,
+        indentType: config.indentType,
+        indentWidth: config.indentWidth,
+        outputStyle: config.outputStyle,
+      }, (error: ?Error, result: {css: string}) => {
         if (error) return reject(error)
         resolve(result.css.toString().trim())
       })

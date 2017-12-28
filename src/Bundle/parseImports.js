@@ -52,15 +52,19 @@ export function parseImports(
       if (typeof parser.parse != 'function') {
         throw Error('Import parser must have a `parse` function')
       }
-      parser.parse(code).forEach(match => {
-        const lineBreak = code.lastIndexOf('\n', match.index)
-        const ref = match[2]
-        imports.set(ref, {
-          line: lineBreaks.indexOf(lineBreak),
-          index: match.index + match[0].indexOf(ref),
+      const parsed = parser.parse(code)
+      if (parsed.length) {
+        parsed.forEach(match => {
+          const lineBreak = code.lastIndexOf('\n', match.index)
+          const ref = match[2]
+          imports.set(ref, {
+            line: lineBreaks.indexOf(lineBreak),
+            index: match.index + match[0].indexOf(ref),
+          })
         })
-      })
-      return imports
+        return imports
+      }
+      return null
     }
   }
 }

@@ -60,6 +60,10 @@ export default class Project { /*::
     if (config.watch) {
       this.root.watch()
     }
+
+    this.bundler.events
+      .on('file:reload', this._reloadFile.bind(this))
+      .on('file:delete', this._deleteFile.bind(this))
   }
 
   get bundler(): Bundler {
@@ -126,10 +130,24 @@ export default class Project { /*::
     const bundles = []
     for (const hash in this.bundles) {
       const bundle = this.bundles[hash]
-      if (bundle.main.test(main)) {
+      if (bundle._main.test(main)) {
         bundles.push(bundle)
       }
     }
     return bundles
+  }
+
+  _reloadFile(file: File): void {
+    const {bundles} = this
+    for (const hash in bundles) {
+      bundles[hash].reloadModule(file)
+    }
+  }
+
+  _deleteFile(file: File): void {
+    const {bundles} = this
+    for (const hash in bundles) {
+      bundles[hash].deleteModule(file)
+    }
   }
 }

@@ -20,19 +20,16 @@ export async function compileBundle(
   bundle: Bundle,
   config: CompilerConfig,
 ): Promise<string> {
-  const main = bundle.getModule(bundle.main)
-  if (!main) throw Error('Missing main module')
-
   let stopped = false
   config.onStop(function() {
     stopped = true
   })
 
   // The build tag prevents duplicate modules.
-  const buildTag = ++bundle._buildTag
+  const buildTag = bundle._buildTag
 
   // The ordered list of resolved modules.
-  const modules: Module[] = [main]
+  const modules: Module[] = []
 
   // Module refs that cannot be resolved.
   const missing = new Map()
@@ -41,7 +38,7 @@ export async function compileBundle(
   const loading = new AsyncTaskGroup(1)
 
   // Start with the main module.
-  await loadModule(main, bundle, onResolve, onUnlink)
+  addModule(bundle.main)
 
   // Wait for all modules to load...
   await loading.push(noop).promise
@@ -95,11 +92,12 @@ export async function compileBundle(
 
   // Emit any unresolved refs.
   if (missing.size) {
+    bundle._dirty = true
     bundle._events.emit('missing', missing)
   }
 
-  // Emit resolved modules for testing purposes.
-  bundle._events.emit('modules', modules)
+  // Keep the module list for debugging purposes.
+  bundle._modules = modules
 
   // The compiler handles the rest.
   return bundle._compiler.joinModules(modules, config)
