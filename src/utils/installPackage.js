@@ -59,7 +59,6 @@ export async function installPackage(
     .pipe(tar.extract(tmp))
     .on('error', onError)
     .on('finish', () => {
-      console.log('tar extracted!')
 
       // Rename the 'package' subdirectory
       const cwd = process.cwd()
@@ -70,7 +69,6 @@ export async function installPackage(
 
       // Install any dependencies
       installDependencies(pkgPath).then(resolve, reject)
-        .then(() => console.log('deps installed!'))
     })
 
     function onError(error) {
