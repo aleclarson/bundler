@@ -9,17 +9,17 @@ import fs from 'fsx'
 
 import type Package from '../../Package'
 import type Module from '../../Bundle/Module'
-import Plugin from '../../Plugin'
 
-const loadModule = (require: any)
+import {lazyRequire} from '../../utils/lazyRequire'
+import Plugin from '../../Plugin'
 
 let ts: any
 
 class TypeScriptPlugin extends Plugin {
   static fileTypes = {'.ts': '.js'}
 
-  load() {
-    ts = loadModule('typescript')
+  async load() {
+    ts = await lazyRequire('typescript')
   }
 
   loadPackage(pkg: Package) {

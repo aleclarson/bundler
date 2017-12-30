@@ -38,8 +38,8 @@ export function createRouter(
         res.end()
       } else {
         if (config.onRead) {
-          await config.onRead(code, res)
-          if (res.headersSent) return
+          const result = await config.onRead(code, res)
+          return res.headersSent ? undefined : result
         }
         res.write(code)
         res.end()

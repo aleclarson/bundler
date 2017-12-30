@@ -10,7 +10,10 @@
     "is-open-comment": "^0.1.1",
     "match-any": "^0.0.1",
     "noop": "aleclarson/noop#0.0.1",
+    "quest": "aleclarson/quest#0.0.1",
     "read-body": "^0.0.1",
+    "registry-auth-token": "^3.3.1",
+    "tar-fs": "^1.16.0",
     "timber": "aleclarson/timber#1.2.1"
   },
   "devDependencies": {
@@ -23,7 +26,7 @@
     "coffeescript": "^2.0.3",
     "flow-bin": "^0.59.0",
     "fsx-mock": "aleclarson/fsx-mock#0.0.1",
-    "testpass": "^0.2.0"
+    "testpass": "^0.5.1"
   },
   "plugins": [
     "lotus-babel"

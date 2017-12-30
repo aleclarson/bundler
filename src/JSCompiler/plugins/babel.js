@@ -12,6 +12,7 @@ import type Package from '../../Package'
 import type Module from '../../Bundle/Module'
 import Plugin from '../../Plugin'
 
+import {lazyRequire} from '../../utils/lazyRequire'
 import {forEach} from '../../utils'
 
 const loadModule = (require: any)
@@ -25,8 +26,8 @@ let babel: any
 class BabelPlugin extends Plugin {
   static fileTypes = ['.js']
 
-  load() {
-    babel = loadModule('babel-core')
+  async load() {
+    babel = await lazyRequire('babel-core')
   }
 
   loadPackage(pkg: Package) {

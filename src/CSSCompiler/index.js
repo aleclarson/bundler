@@ -12,14 +12,13 @@ import type Plugin from '../Plugin'
 import type Bundle from '../Bundle'
 import type File from '../File'
 
-import {huey} from '../logger'
 import Module from '../Bundle/Module'
 import Compiler from '../Compiler'
 import CSSPackage from './Package'
 
 export class CSSCompiler extends Compiler {
   static match = (bundle: Bundle) => {
-    return bundle.type == '.css'
+    return bundle._type == '.css'
   }
 
   static plugins = [

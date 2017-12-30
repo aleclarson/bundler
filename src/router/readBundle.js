@@ -4,13 +4,16 @@ import path from 'path'
 import noop from 'noop'
 
 import type {Platform} from '../File'
+import type {Module} from '../Bundle'
 import type Project from '../Project'
 
 import {log, huey} from '../logger'
 import * as utils from './utils'
 
 export type ReadConfig = {
+  dev?: boolean;
   main?: string;
+  platform?: Platform;
   onRead?: (code: string) => mixed;
   onStop?: (listener: Function) => void;
 }
@@ -22,7 +25,7 @@ export async function readBundle(
   config: ReadConfig,
   project: Project,
 ): Promise<Result> {
-  const platform: Platform = req.query.platform
+  const platform: Platform = config.platform || req.query.platform
   if (!platform) {
     const error = `Expected \`query.platform\` to exist`
     return {status: 400, error}
@@ -32,20 +35,17 @@ export async function readBundle(
     var main = path.join(project.root.path, config.main)
   }
 
-  const dev = utils.parseBool(req.query.dev, false)
+  const dev = config.dev != null ?
+    config.dev : utils.parseBool(req.query.dev, false)
+
   try {
-    var bundle = project.bundle({dev, main, platform})
+    var bundle = await project.bundle({dev, main, platform})
   } catch(error) {
     if (error.code == 'NO_MAIN_MODULE') {
       return {status: 400, error: error.message}
     } else {
       throw error
     }
-  }
-
-  const wasCached = bundle.isCached
-  if (wasCached) {
-    utils.clearTerminal()
   }
 
   let missed = false
@@ -57,11 +57,11 @@ export async function readBundle(
     log('')
     log('These imports cannot be found:')
     log('')
-    missing.forEach((refs, mod) => {
+    missing.forEach((refs: Set<string>, mod: Module) => {
       const {imports} = mod.file
       const name = path.relative(root, mod.path)
       refs.forEach(ref => {
-        const line = huey.gray(`:${1 + imports[ref].line}`)
+        const line = huey.gray(`:${1 + (imports: any).get(ref).line}`)
         log(`  ~/${name}${line} ` + huey.red('➤ ' + ref))
       })
     })
@@ -72,12 +72,13 @@ export async function readBundle(
     config.onStop = noop
   }
 
+  const cached = bundle.isCached
   const started = Date.now()
   try {
     let code = await bundle.read((config: Object))
     if (missed) {
       code = `throw Error('Bundle failed. Please check your terminal.')`
-    } else if (code && !wasCached) {
+    } else if (code && !cached) {
       const elapsed = huey.cyan(utils.getElapsed(started))
       const name = huey.green('~/' + bundle._main.name)
       log(`📦 Bundled ${name} in ${elapsed}`)

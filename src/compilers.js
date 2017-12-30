@@ -30,5 +30,5 @@ export function loadCompiler(bundle: Bundle): Compiler {
       return new compiler(bundle)
     }
   }
-  throw Error(`No compiler for bundle: '${bundle.main.path}'`)
+  throw Error(`No compiler for bundle: '${bundle._main.path}'`)
 }

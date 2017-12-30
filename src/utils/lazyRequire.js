@@ -1,42 +1,24 @@
 // @flow
 
-import {exec} from 'child_process'
-
 import path from 'path'
+import os from 'os'
 
+import {installPackage} from './installPackage'
 import {huey} from '../logger'
 
-// Packages are loaded from the `cara` directory.
-const cwd = path.resolve(__dirname, '../..')
+// Packages are stored in `~/.cara/packages`
+const PACKAGE_DIR = path.join(os.homedir(), '.cara/packages')
 
-// Require a package relative to the given directory.
-// If the package is missing, install from NPM.
 export async function lazyRequire(name: string): Promise<any> {
-  const main = path.join(cwd, 'node_modules', name)
+  const dep = path.join(PACKAGE_DIR, name)
   try {
-    require.resolve(main)
+    require.resolve(dep)
   } catch(e) {
-    await installPackage(name, cwd)
-  }
-  return require(main)
-}
-
-function installPackage(name: string, cwd: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const cmd = 'npm install --silent --no-save ' + name
-    exec(cmd, {cwd}, (error, stdout, stderr) => {
-      if (typeof stderr == 'string') {
-        stderr = stderr.trim()
-        if (stderr.length) {
-          const prefix = huey.red('stderr: ')
-          console.error(prefix + stderr.replace(/\n/g, '\n' + prefix))
-        }
-      }
-      if (error) {
-        reject(error)
-      } else {
-        resolve()
-      }
+    console.log(huey.red(e.message))
+    console.log('Installing package: ' + huey.yellow(name))
+    await installPackage(name, PACKAGE_DIR).catch(error => {
+      console.log('url = ' + error.url)
     })
-  })
+  }
+  return require(dep)
 }

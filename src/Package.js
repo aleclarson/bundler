@@ -151,41 +151,40 @@ export default class Package { /*::
     this.meta = JSON.parse(fs.readFile(metaPath))
   }
 
-  _loadPlugins(fileType: string): void {
-    const plugins = this.plugins[fileType]
-    if (plugins) return
+  async _loadPlugins(fileType: string): Promise<void> {
+    let loaded = this.plugins[fileType]
+    if (!loaded) {
+      const plugins = getPlugins(fileType)
+      const outputTypes = new Set()
 
-    const outputTypes = new Set()
-    getPlugins(fileType).forEach((plugin: Plugin) => {
-      if (plugin.loadPackage(this)) {
-        if (plugins) {
-          plugins.push(plugin)
-        } else {
-          this.plugins[fileType] = [plugin]
-        }
+      this.plugins[fileType] = loaded = []
+      for (let i = 0; i < plugins.length; i++) {
+        const plugin = plugins[i]
+        if (plugin.loadPackage(this)) {
+          loaded.push(plugin)
 
-        // Prepare the plugin.
-        if (!plugin.loaded) {
-          plugin.loaded = true
-          plugin.load()
-        }
+          // Prepare the plugin.
+          if (!plugin.loaded) {
+            plugin.loaded = true
+            await plugin.load()
+          }
 
-        // Load plugins for output types.
-        const {fileTypes} = plugin
-        if (fileTypes && !Array.isArray(fileTypes)) {
-          const outputType = fileTypes[fileType]
-          if (outputType) {
-            outputTypes.add(outputType)
-          } else {
-            throw Error(`Unsupported file type: '${fileType}'`)
+          // Load plugins for output types.
+          const {fileTypes} = plugin
+          if (fileTypes && !Array.isArray(fileTypes)) {
+            const outputType = fileTypes[fileType]
+            if (outputType) {
+              outputTypes.add(outputType)
+            } else {
+              throw Error(`Unsupported file type: '${fileType}'`)
+            }
           }
         }
       }
-    })
-
-    if (outputTypes.size) {
-      outputTypes.forEach(fileType =>
-        this._loadPlugins(fileType))
+      if (outputTypes.size) {
+        outputTypes.forEach(fileType =>
+          this._loadPlugins(fileType))
+      }
     }
   }
 }

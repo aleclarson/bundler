@@ -82,10 +82,7 @@ export default class Bundler { /*::
     if (files[filePath] == null) {
       if (!pkg) pkg = this.findPackage(filePath)
       files[filePath] = new File(filePath, fileType, pkg)
-      if (fileType) {
-        pkg.fileTypes.add(fileType)
-        pkg._loadPlugins(fileType)
-      }
+      if (fileType) pkg.fileTypes.add(fileType)
     } else {
       throw uhoh(`File already exists: '${filePath}'`, 'FILE_EXISTS')
     }

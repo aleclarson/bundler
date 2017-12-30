@@ -41,7 +41,7 @@ export class JSCompiler extends Compiler { /*::
   }
 
   static match = (bundle: Bundle) => {
-    return bundle.type == '.js'
+    return bundle._type == '.js'
   }
 
   static plugins = [
@@ -251,8 +251,8 @@ function replaceImportPaths(
     sorted.forEach((dep, index) => {
       const depId = moduleIds.get(dep.mod)
       if (dep.ref != depId) {
-        output.push(input.slice(inputIndex, index), depId)
-        inputIndex = index + dep.ref.length
+        output.push(input.slice(inputIndex, index - 1), formatId(depId))
+        inputIndex = index + dep.ref.length + 1
       }
     })
     output.push(input.slice(inputIndex))

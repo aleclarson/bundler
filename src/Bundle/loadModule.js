@@ -6,7 +6,6 @@ import fs from 'fsx'
 import type Bundle, {Module} from '../Bundle'
 import type {ResolveListener} from './resolveImports'
 
-import {huey} from '../logger'
 import {resolveImports} from './resolveImports'
 
 type UnlinkListener = (dep: Module, parent: Module) => void
@@ -27,6 +26,9 @@ export async function loadModule(
 
   // Keep previous imports so we can unlink old dependencies.
   const prevImports = file.imports
+
+  // Load any plugins used by this module.
+  await mod.package._loadPlugins(file.type)
 
   // Let the compiler parse and transform the body.
   await bundle._compiler.loadModule(mod)

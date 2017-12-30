@@ -14,7 +14,7 @@ export async function updateBundles(
 ): Promise<Result> {
   const bundles = project.findBundles(main)
   if (!bundles.length) {
-    const error = `No bundles have an entry module of '${req.assetId}'`
+    const error = `Missing main module: '${main}'`
     return {status: 404, error}
   }
 

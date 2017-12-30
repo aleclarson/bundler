@@ -10,6 +10,7 @@ import type {Platform} from './File'
 import type {Watcher} from './utils/watchPackage'
 import type Bundler from './Bundler'
 
+import {resolveFileType} from './utils/resolveFileType'
 import {forEach, uhoh} from './utils'
 import {createRouter} from './router'
 import Package from './Package'
@@ -37,7 +38,6 @@ export default class Project { /*::
   +fileTypes: string[];
   +excludeRE: ?RegExp;
   +bundles: { [hash: string]: Bundle };
-  _crawlOptions: CrawlOptions;
 */
   constructor(config: ProjectConfig, bundler: Bundler) {
     const root = path.resolve(config.root)
@@ -88,7 +88,7 @@ export default class Project { /*::
     this.root.crawl(config)
   }
 
-  bundle(config: BundleConfig): Bundle {
+  async bundle(config: BundleConfig): Promise<Bundle> {
 
     // Resolve the entry point.
     let main: ?File
@@ -108,14 +108,11 @@ export default class Project { /*::
 
       let bundle = this.bundles[hash]
       if (!bundle || config.force) {
-        // Ensure all plugins are loaded.
-        pkg.fileTypes.forEach(fileType => pkg._loadPlugins(fileType))
-
-        // Create a new bundle.
         this.bundles[hash] =
           bundle = new Bundle({
             dev: config.dev,
             main,
+            type: await resolveFileType(main),
             project: this,
             platform: config.platform,
           })

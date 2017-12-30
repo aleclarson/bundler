@@ -34,7 +34,10 @@ export default class Plugin {
   }
 
   // This method is called when the first compatible package is found.
-  load(): ?Promise<void> {}
+  // Plugins can call this from within `loadPackage` if necessary.
+  load(): ?Promise<void> {
+    this.loaded = true
+  }
 
   // Most plugins inspect each file to determine compatibility.
   loadFile(file: File): boolean {
