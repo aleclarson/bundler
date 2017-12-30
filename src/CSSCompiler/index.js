@@ -99,6 +99,7 @@ async function applyPlugins(
   main: Module,
 ): Promise<string> {
   const pkg = main.package
+  main.type = main.file.type
   while (true) {
     const {type} = main
     const plugins = pkg.plugins[type]
