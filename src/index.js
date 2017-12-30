@@ -9,7 +9,3 @@ export {Module} from './Bundle'
 export {default as Package} from './Package'
 export {default as Plugin} from './Plugin'
 export {default as Project} from './Project'
-
-// Functions
-export {addPlugin} from './plugins'
-export {addCompiler} from './compilers'
