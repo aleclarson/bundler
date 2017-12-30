@@ -21,11 +21,11 @@ class SassPlugin extends Plugin {
     sass = await lazyRequire('node-sass')
   }
 
-  transform(input: string, config: Object = {}): Promise<string> {
+  transform(input: string, pkg: Package): Promise<string> {
+    const config = pkg.meta.sass || {}
     return new Promise((resolve, reject) => {
       sass.render({
         data: input,
-        file: config.file,
         linefeed: config.linefeed,
         indentType: config.indentType,
         indentWidth: config.indentWidth,

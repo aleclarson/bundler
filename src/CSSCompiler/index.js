@@ -106,7 +106,7 @@ async function applyPlugins(
       for (let i = 0; i < plugins.length; i++) {
         const plugin: Plugin = (plugins[i]: any)
         if (typeof plugin.transform == 'function') {
-          payload = await plugin.transform(payload)
+          payload = await plugin.transform(payload, pkg)
           main.type = plugin.convert(type)
           if (main.type != type) break
         }
