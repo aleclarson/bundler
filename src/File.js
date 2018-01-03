@@ -37,10 +37,10 @@ export default class File { /*::
     return path.relative(this.package.path, this.path)
   }
 
-  test(name: string): boolean {
+  match(name: string): boolean {
     let filePath = this.path
     if (this.platform) {
-      filePath = filePath.replace('.' + this.platform, '')
+      filePath = filePath.replace(`.${this.platform}.`, `.`)
     }
     return filePath.endsWith(name)
   }
