@@ -1,6 +1,6 @@
 {
   "name": "cara",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "js/index",
   "dependencies": {
     "AsyncTaskGroup": "aleclarson/AsyncTaskGroup#1.1.0",

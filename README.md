@@ -1,5 +1,5 @@
 
-# cara v0.0.1 ![experimental](https://img.shields.io/badge/stability-experimental-EC5315.svg?style=flat)
+# cara v0.0.2 ![experimental](https://img.shields.io/badge/stability-experimental-EC5315.svg?style=flat)
 
 ```js
 const {Bundler} = require('cara')
