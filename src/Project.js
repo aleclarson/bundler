@@ -123,11 +123,11 @@ export default class Project { /*::
     throw uhoh(`Missing main module for platform: '${config.platform}'`, 'NO_MAIN_MODULE')
   }
 
-  findBundles(main: string): Bundle[] {
+  filterBundles(filter: (bundle: Bundle) => boolean): Bundle[] {
     const bundles = []
     for (const hash in this.bundles) {
       const bundle = this.bundles[hash]
-      if (bundle._main.test(main)) {
+      if (filter(bundle)) {
         bundles.push(bundle)
       }
     }
