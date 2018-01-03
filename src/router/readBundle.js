@@ -44,7 +44,7 @@ export async function readBundle(
     if (error.code == 'NO_MAIN_MODULE') {
       return {status: 400, error: error.message}
     } else {
-      throw error
+      return {status: 500, error: error.stack}
     }
   }
 
