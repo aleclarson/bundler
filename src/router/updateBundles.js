@@ -1,3 +1,4 @@
+// @flow
 
 import readBody from 'read-body'
 import path from 'path'
@@ -9,18 +10,11 @@ type Result = {status: number, error?: string}
 
 export async function updateBundles(
   req: Object,
-  main: string,
   project: Project,
 ): Promise<Result> {
-  const bundles = project.findBundles(main)
-  if (!bundles.length) {
-    const error = `Missing main module: '${main}'`
-    return {status: 404, error}
-  }
-
-  const buffer = await req.body || readBody(req, 1e8)
+  const body = await readBody(req, 1e8)
   try {
-    var patch = JSON.parse(buffer.toString())
+    var patch = JSON.parse(body.toString())
   } catch(e) {
     const error = 'Expected `body` to be valid JSON'
     return {status: 400, error}
@@ -32,20 +26,22 @@ export async function updateBundles(
 
   const file = project.bundler.getFile(patch.file)
   if (!file) {
-    const error = `No bundles use the given file: '${patch.file}'`
-    return {status: 404, error}
+    return {status: 404}
   }
+
+  const bundles = project
+    .filterBundles(bundle => bundle.hasModule(file))
 
   if (patch.event == 'change') {
     bundles.forEach(bundle => {
       bundle.reloadModule(patch.file)
     })
-  } else if (unlinkRE.test(patch.event)) {
+  } else if (patch.event == 'unlink') {
     bundles.forEach(bundle => {
       bundle.deleteModule(patch.file)
     })
   } else {
-    const error = 'Expected `body.event` to equal "change" or "delete"'
+    const error = 'Expected `body.event` to equal "change" or "unlink"'
     return {status: 400, error}
   }
 

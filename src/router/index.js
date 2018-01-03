@@ -48,7 +48,7 @@ export function createRouter(
 
     else if (req.method == 'PATCH') {
       const {status, error} =
-        await updateBundles(req, config.main || req.path, project)
+        await updateBundles(req, project)
 
       if (status == 404) {
         req.next()
