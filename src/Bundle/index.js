@@ -80,6 +80,10 @@ export default class Bundle { /*::
     return !this._dirty
   }
 
+  match(name: string): boolean {
+    return this._main.match(name)
+  }
+
   reset(): void {
     this._map = new Map()
     this._dirty = true
