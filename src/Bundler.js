@@ -4,6 +4,7 @@
 
 import EventEmitter from 'events'
 import path from 'path'
+import fs from 'fsx'
 
 import type {ProjectConfig} from './Project'
 
@@ -59,19 +60,21 @@ export default class Bundler { /*::
     return packages[root]
   }
 
+  // TODO: Support a preferred file type (in case two files share a name).
   getFile(filePath: string, fileTypes?: Set<string>): ?File {
     if (!path.isAbsolute(filePath)) {
       throw Error(`Expected an absolute path: '${filePath}'`)
     }
-    const {files} = this
-    let file = files[filePath]
-    if (file) {
-      return file
-    } else if (fileTypes) {
-      return search(fileTypes, (fileType) => {
-        return files[filePath + fileType]
+    let file = this.files[filePath]
+    if (!file && fileTypes) {
+      file = search(fileTypes, (fileType) => {
+        return this.files[filePath + fileType]
       })
+      if (!file && fs.isDir(filePath)) {
+        file = this.getFile(path.join(filePath, 'index'), fileTypes)
+      }
     }
+    return file
   }
 
   addFile(filePath: string, fileType: string, pkg: ?Package): void {
