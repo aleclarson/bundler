@@ -50,9 +50,13 @@ export function createRouter(
       const {status, error} =
         await updateBundles(req, config.main || req.path, project)
 
-      res.statusCode = status
-      error && res.write(error)
-      res.end()
+      if (status == 404) {
+        req.next()
+      } else {
+        res.statusCode = status
+        error && res.write(error)
+        res.end()
+      }
     }
 
     else {
