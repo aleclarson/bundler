@@ -24,7 +24,7 @@ export async function updateBundles(
     return {status: 400, error}
   }
 
-  const file = project.bundler.getFile(patch.file)
+  const file = project.bundler.files[patch.file]
   if (!file) {
     return {status: 404}
   }
