@@ -4,9 +4,6 @@ noop = require "noop"
 tp = require "testpass"
 vm = require "vm"
 
-huey = require "huey"
-log = require "timber"
-
 Bundler = require "../../Bundler"
 bundler = new Bundler()
 
@@ -30,9 +27,6 @@ tp.beforeEach ->
     main: main
     platform: "web"
     force: true
-
-  bundle.on "modules", (modules) ->
-    bundle._modules = modules
 
   await runBundle()
   if bundle._modules.length isnt 1
@@ -101,14 +95,12 @@ tp.group ->
     writeModule main, "import q from './q'"
 
     await readBundle()
-    t.eq hasMissing(main), true
     t.eq getModuleNames(), [main]
 
   tp.test "add missing relative", (t) ->
     writeModule "q.js"
 
     await readBundle()
-    t.eq hasMissing(main), false
     t.eq getModuleNames(), [main, "q.js"]
 
 # These tests use the same bundle.
@@ -120,17 +112,16 @@ tp.group ->
     writeModule main, "import x from 'x'"
 
     await readBundle()
-    t.eq hasMissing(main), true
+    t.eq getModuleNames(), [main]
 
   tp.test "add missing node_modules package", (t) ->
     fs.reset dep
     fs.writeFile depMain = "#{dep}/index.js"
 
-    # We have to call this manually, because `watchPackage` does this.
+    # Since `watchPackage` is not used in tests, we call this manually.
     bundler.package path.join root, dep
 
     await readBundle()
-    t.eq hasMissing(main), false
     t.eq getModuleNames(), [main, depMain]
 
 # These tests use the same bundle.
@@ -223,9 +214,6 @@ runBundle = (ctx = {}) ->
   code = await readBundle()
   vm.runInNewContext code, ctx
   return ctx
-
-hasMissing = (filePath) ->
-  getModule(filePath)._unresolved
 
 getModule = (filePath) ->
   unless path.isAbsolute filePath

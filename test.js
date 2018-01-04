@@ -2,14 +2,14 @@
 
 require('coffeescript/register')
 
-const sourceRoot = __dirname + '/src'
+const sourceRoot = __dirname + '/src/'
 const testGlob = '**/__tests__/*.(js|coffee)'
 
 const Module = require('module')
 const globRegex = require('glob-regex')
 
 const testPathRE = globRegex(testGlob)
-const buildRoot = __dirname + '/js'
+const buildRoot = __dirname + '/js/'
 
 // TODO: Add this functionality to `testpass`
 const resolve = Module._resolveFilename

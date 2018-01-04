@@ -1,0 +1,10 @@
+
+$main-font-color: #000;
+
+@import './core';
+
+body {
+  color: $main-font-color;
+  background-color: gray(90%);
+}
+
