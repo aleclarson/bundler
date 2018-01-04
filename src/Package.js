@@ -98,22 +98,11 @@ export default class Package { /*::
   // watchFile(file: string): void {}
 
   // TODO: Support other file types?
-  resolveMain(platform: ?Platform): ?File {
-    const {files} = this.bundler
-    const main = setFileType(this.meta.main || 'index', '.js')
-
-    let file
-    if (platform) {
-      file = path.resolve(this.path, setPlatform(main, platform))
-      if (files.hasOwnProperty(file)) {
-        return files[file]
-      }
-    }
-
-    file = path.resolve(this.path, main)
-    if (files.hasOwnProperty(file)) {
-      return files[file]
-    }
+  resolveMain(platform: Platform, preferredType: ?string): ?File {
+    const main = this.meta.main || 'index'
+    const file = this.getFile(main, platform, preferredType)
+    if (file) return file
+    log.warn('missing main module for package: ' + this.path)
   }
 
   hasFile(file: string): boolean {
