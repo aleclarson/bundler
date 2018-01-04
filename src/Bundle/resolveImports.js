@@ -48,8 +48,8 @@ function resolveImport(
   bundle: Bundle,
 ): ?File {
   if (ref[0] == '.') {
-    const dir = path.dirname(src.path)
-    return src.package.getFile(path.resolve(dir, ref))
+    ref = path.resolve(path.dirname(src.path), ref)
+    return src.package.getFile(ref, bundle.platform, src.type)
   } else if (path.isAbsolute(ref)) {
     throw Error([
       `Absolute imports are not supported:`,
@@ -67,9 +67,9 @@ function resolveImport(
         exclude: project.excludeRE,
       })
       if (sep >= 0) {
-        return pkg.getFile(ref.slice(sep + 1))
+        return pkg.getFile(ref.slice(sep + 1), bundle.platform, src.type)
       } else {
-        return pkg.resolveMain(bundle.platform)
+        return pkg.resolveMain(bundle.platform, src.type)
       }
     }
   }
