@@ -37,7 +37,8 @@ class TypeScriptPlugin extends Plugin {
   }
 
   transform(mod: Module, pkg: Package) {
-    mod._body = ts.transpileModule(mod._body, pkg.meta._tsconfig)
+    const res = ts.transpileModule(mod._body, pkg.meta._tsconfig)
+    mod._body = res.outputText
     mod.type = '.js'
   }
 }
