@@ -95,7 +95,7 @@ export default class Package { /*::
   }
 
   // TODO: Add ability to watch specific file for changes.
-  // watchFile(file: string): void {}
+  // watchFile(filePath: string): void {}
 
   // TODO: Support other file types?
   resolveMain(platform: Platform, preferredType: ?string): ?File {
@@ -105,16 +105,16 @@ export default class Package { /*::
     log.warn('missing main module for package: ' + this.path)
   }
 
-  hasFile(file: string): boolean {
+  hasFile(filePath: string): boolean {
     const {files} = this.bundler
-    if (path.isAbsolute(file)) {
-      if (file.startsWith(this.path)) {
-        return files.hasOwnProperty(file)
+    if (path.isAbsolute(filePath)) {
+      if (filePath.startsWith(this.path)) {
+        return files.hasOwnProperty(filePath)
       } else {
         return false
       }
     } else {
-      return files.hasOwnProperty(path.join(this.path, file))
+      return files.hasOwnProperty(path.join(this.path, filePath))
     }
   }
 
