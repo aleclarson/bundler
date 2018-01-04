@@ -45,11 +45,11 @@ export function crawlPackage(pkg: Package, config: CrawlOptions = {}): void {
       const name = names[i]
       if (!blacklistRE.test(name) && !excludeRE.test(name)) {
         let isDir = null
-        let filePath = path.join(dir, name)
-        filePath = resolveLinks(filePath, (destPath) => {
+        const filePath = path.join(dir, name)
+        const linkedPath = resolveLinks(filePath, (destPath) => {
           // Keep paths within the root package.
-          const relPath = path.relative(pkg.path, destPath)
-          if (relPath[0] != '.') return false
+          const rel = path.relative(pkg.path, destPath)
+          if (rel[0] != '.') return false
 
           // Check if the real path is a directory.
           isDir = fs.isDir(fs.readLinks(destPath))
@@ -61,14 +61,23 @@ export function crawlPackage(pkg: Package, config: CrawlOptions = {}): void {
           isDir = fs.isDir(filePath)
         }
 
+        const isLink = filePath != linkedPath
         if (isDir) {
-          pkg.dirs.add(filePath.slice(pkg.path.length + 1))
-          deeper(filePath)
-        } else {
-          const fileType = path.extname(name)
-          if (fileTypesRE.test(fileType)) {
-            pkg.fileTypes.add(fileType)
-            bundler.addFile(filePath, fileType, pkg)
+          const from = pkg.path.length + 1
+          if (isLink) pkg.dirs.add(filePath.slice(from))
+          pkg.dirs.add(linkedPath.slice(from))
+          deeper(linkedPath)
+        }
+        else if (bundler.files[filePath] == null) {
+          let file = isLink ? bundler.files[linkedPath] : null
+          if (!file) {
+            const fileType = path.extname(name)
+            if (fileTypesRE.test(fileType)) {
+              file = bundler.addFile(linkedPath, fileType, pkg)
+            }
+          }
+          if (isLink && file) {
+            bundler.files[filePath] = file
           }
         }
       }

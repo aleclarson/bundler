@@ -66,17 +66,19 @@ export default class Bundler { /*::
     return this.files[filePath]
   }
 
-  addFile(filePath: string, fileType: string, pkg: ?Package): void {
+  addFile(filePath: string, fileType: string, pkg: ?Package): File {
     if (!path.isAbsolute(filePath)) {
       throw Error(`Expected an absolute path: '${filePath}'`)
     }
     const {files} = this
-    if (files[filePath] == null) {
-      if (!pkg) pkg = this.findPackage(filePath)
-      files[filePath] = new File(filePath, fileType, pkg)
-      if (fileType) pkg.fileTypes.add(fileType)
-    } else {
+    if (files.hasOwnProperty(filePath)) {
       throw uhoh(`File already exists: '${filePath}'`, 'FILE_EXISTS')
+    } else {
+      if (!pkg) pkg = this.findPackage(filePath)
+      if (fileType) pkg.fileTypes.add(fileType)
+      const file = new File(filePath, fileType, pkg)
+      files[filePath] = file
+      return file
     }
   }
 
