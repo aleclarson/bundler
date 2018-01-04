@@ -4,6 +4,7 @@
 
 import EventEmitter from 'events'
 import path from 'path'
+import huey from 'huey'
 import fs from 'fsx'
 
 import type {ProjectConfig} from './Project'

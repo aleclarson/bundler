@@ -25,6 +25,11 @@ class TypeScriptPlugin extends Plugin {
   loadPackage(pkg: Package) {
     const config = readConfig(pkg)
     if (config) {
+      config.compilerOptions = {
+        ...config.compilerOptions,
+        sourceMap: false,
+        inlineSourceMap: false,
+      }
       pkg.meta._tsconfig = config
       return true
     }
