@@ -1,5 +1,7 @@
 // @flow
 
+// TODO: Update `package.dirs` accordingly
+
 import globRegex from 'glob-regex'
 import path from 'path'
 import fs from 'fsx'

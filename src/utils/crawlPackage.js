@@ -62,6 +62,7 @@ export function crawlPackage(pkg: Package, config: CrawlOptions = {}): void {
         }
 
         if (isDir) {
+          pkg.dirs.add(filePath.slice(pkg.path.length + 1))
           deeper(filePath)
         } else {
           const fileType = path.extname(name)
