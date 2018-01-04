@@ -12,8 +12,9 @@ import type {Watcher} from './utils/watchPackage'
 import type Bundler from './Bundler'
 import type Plugin from './Plugin'
 
-import {uhoh} from './utils'
+import {log} from './logger'
 import {getPlugins} from './plugins'
+import {uhoh, search} from './utils'
 import {crawlPackage} from './utils/crawlPackage'
 import {watchPackage} from './utils/watchPackage'
 
@@ -126,11 +127,25 @@ export default class Package { /*::
     }
   }
 
-  getFile(file: string): ?File {
-    if (!path.isAbsolute(file)) {
-      file = path.join(this.path, file)
+  getFile(filePath: string, platform: Platform, preferredType: ?string): ?File {
+    if (!path.isAbsolute(filePath)) {
+      filePath = path.join(this.path, filePath)
     }
-    return this.bundler.getFile(file, this.fileTypes)
+    const fileType = path.extname(filePath)
+    if (fileType) {
+      if (!this.fileTypes.has(fileType)) {
+        log.warn('file has unknown type: ' + filePath)
+        return null
+      }
+      const {files} = this.bundler
+      const platformPath =
+        filePath.slice(0, 1 - fileType.length) + platform + fileType
+      return files[platformPath] || files[filePath]
+    }
+    if (fs.isDir(filePath)) {
+      filePath = path.join(filePath, 'index')
+    }
+    return this._findFile(filePath, platform, preferredType) || null
   }
 
   hasDependency(name: string, dev?: boolean): boolean {
@@ -149,6 +164,25 @@ export default class Package { /*::
   _readMeta(): void {
     const metaPath = path.join(this.path, 'package.json')
     this.meta = JSON.parse(fs.readFile(metaPath))
+  }
+
+  _findFile(
+    filePath: string,
+    platform: Platform,
+    preferredType: ?string,
+  ): ?File {
+    const {files} = this.bundler
+    if (preferredType) {
+      const platformPath = filePath + '.' + platform + preferredType
+      const file = files[platformPath] || files[filePath + preferredType]
+      if (file) return file
+    }
+    return search(this.fileTypes, (fileType) => {
+      if (fileType != preferredType) {
+        const platformPath = filePath + '.' + platform + fileType
+        return files[platformPath] || files[filePath + fileType]
+      }
+    })
   }
 
   async _loadPlugins(fileType: string): Promise<void> {
@@ -206,14 +240,4 @@ function setFileType(file: string, type: string): string {
   if (!ext) return file + type
   if (ext == type) return file
   return path.basename(file, ext) + type
-}
-
-function setPlatform(file: string, platform: string): string {
-  const parts = file.split('.')
-  if (parts.length > 1) {
-    parts.splice(parts.length - 1, 0, platform)
-  } else {
-    parts.push(platform)
-  }
-  return parts.join('.')
 }
