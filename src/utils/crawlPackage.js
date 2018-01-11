@@ -31,8 +31,14 @@ export function crawlPackage(pkg: Package, config: CrawlOptions = {}): void {
     '', fileTypesRE.source, excludeRE.source
   ].join(':')
 
+  if (global.bundleTimer) {
+    var timer = global.bundleTimer('crawl', path.relative(process.cwd(), pkg.path))
+  }
+
   // Start at package root, or the given sub-directory.
   deeper(path.join(pkg.path, config.root || ''))
+
+  timer && timer.done()
 
   // Crawl a directory recursively.
   function deeper(dir: string): void {

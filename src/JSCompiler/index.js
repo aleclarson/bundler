@@ -67,11 +67,13 @@ export class JSCompiler extends Compiler { /*::
       prelude.join('\n')
     ]
 
+    const timer = global.bundleTimer('wrapModule')
     for (let i = 0; i < modules.length; i++) {
       const mod = modules[i]
       const body = this.wrapModule(mod)
       output.push(body)
     }
+    timer.done()
 
     const mainId = this.moduleIds.get(modules[0])
     output.push('\n  require(' + formatId(mainId) + ')\n})()')
@@ -225,10 +227,13 @@ function renderGlobals(globals: ?Object, dev: boolean): string {
 }
 
 function readPolyfill(file: string): string {
+  const timer = global.bundleTimer('readPolyfill', file)
   if (!path.isAbsolute(file)) {
     file = require.resolve('../../polyfills/' + file)
   }
-  return indentLines(fs.readFile(file), 1) + '\n'
+  const code = indentLines(fs.readFile(file), 1) + '\n'
+  timer.done()
+  return code
 }
 
 function replaceImportPaths(

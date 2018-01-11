@@ -7,6 +7,7 @@ import type {Platform} from '../File'
 import type {Module} from '../Bundle'
 import type Project from '../Project'
 
+import {createTimer} from '../utils/timer'
 import {log, huey} from '../logger'
 import * as utils from './utils'
 
@@ -75,7 +76,9 @@ export async function readBundle(
   const cached = bundle.isCached
   const started = Date.now()
   try {
+    let timer = createTimer()
     let code = await bundle.read((config: Object))
+    console.log('readBundle: ' + (timer.done().endTime - timer.startTime).toFixed(2))
     if (missed) {
       code = `throw Error('Bundle failed. Please check your terminal.')`
     } else if (code && !cached) {

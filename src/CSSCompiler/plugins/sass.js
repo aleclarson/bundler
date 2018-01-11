@@ -6,7 +6,7 @@
 import type Package from '../../Package'
 import type Module from '../../Bundle/Module'
 
-import {lazyRequire} from '../../utils/lazyRequire'
+import {lazyRequire} from '../../utils/lazyInstall'
 import Plugin from '../../Plugin'
 
 let sass: any

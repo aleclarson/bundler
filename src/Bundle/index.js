@@ -17,6 +17,7 @@ import Module from './Module'
 
 import {compileBundle} from './compileBundle'
 import {loadCompiler} from '../compilers'
+import {createTimer} from '../utils/timer'
 import {uhoh} from '../utils'
 
 export {default as Module} from './Module'
@@ -106,15 +107,25 @@ export default class Bundle { /*::
       } catch(e) {}
     }
 
+    if (!global.bundleTimer) {
+      global.bundleTimer = createTimer()
+    }
+
     // Build the bundle from scratch.
     const buildTag = ++this._buildTag
     const building = compileBundle(this, config)
 
     // Save the bundle to disk unless another build begins.
     this._building = building.then(payload => {
+      const bundleTime = global.bundleTimer.done()
+      console.log('\n' + bundleTime.toString('  ') + '\n')
+      global.bundleTimer = null
+
       if (this._buildTag == buildTag) {
+        const timer = createTimer()
         fs.writeDir(path.dirname(this._path))
         fs.writeFile(this._path, payload)
+        console.log('saveBundle: ' + timer.done().elapsed())
       }
     }).catch(error => {
       this._events.emit('error', error)

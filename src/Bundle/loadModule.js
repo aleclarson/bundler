@@ -18,8 +18,12 @@ export async function loadModule(
 ): Promise<void> {
   const {file} = mod
 
+  let timer = global.bundleTimer('readFile', bundle.relative(file.path))
+
   // Read the module into memory.
   mod._body = fs.readFile(file.path)
+
+  timer.done()
 
   // Reset the module type.
   mod.type = file.type
@@ -32,6 +36,8 @@ export async function loadModule(
 
   // Let the compiler parse and transform the body.
   await bundle._compiler.loadModule(mod)
+
+  timer = global.bundleTimer('resolveImports', bundle.relative(mod.path))
 
   const nextImports = file.imports
   if (nextImports != prevImports) {
@@ -63,4 +69,5 @@ export async function loadModule(
       })
     }
   }
+  timer.done()
 }

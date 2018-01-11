@@ -191,8 +191,10 @@ export default class Package { /*::
 
           // Prepare the plugin.
           if (!plugin.loaded) {
+            console.log('Loading plugin: ' + plugin.name)
             plugin.loaded = true
             await plugin.load()
+            console.log('Loaded plugin: ' + plugin.name)
           }
 
           // Load plugins for output types.

@@ -10,6 +10,7 @@ import type Bundle, {Module} from '../Bundle'
 
 import {resolveImports} from './resolveImports'
 import {loadModule} from './loadModule'
+import workers from '../utils/workers'
 
 type CompilerConfig = {
   onStop: Function,
@@ -34,11 +35,13 @@ export async function compileBundle(
   // Module refs that cannot be resolved.
   const missing = new Map()
 
-  // Load one module at a time.
+  // Limit the number of modules loading at once.
   const loading = new AsyncTaskGroup(1)
 
   // Start with the main module.
   addModule(bundle.main)
+
+  process.nextTick(() => workers.flushAll())
 
   // Wait for all modules to load...
   await loading.push(noop).promise
@@ -59,7 +62,9 @@ export async function compileBundle(
           onResolve(mod, ref, dep)
         })
       }
+      process.nextTick(() => workers.flushAll())
     })
+    console.log('numConcurrent = ' + loading.numConcurrent)
   }
 
   // Add resolved dependencies to the bundle.
@@ -99,6 +104,11 @@ export async function compileBundle(
   // Keep the module list for debugging purposes.
   bundle._modules = modules
 
+  const timer = global.bundleTimer('joinModules')
+
   // The compiler handles the rest.
-  return bundle._compiler.joinModules(modules, config)
+  const res = bundle._compiler.joinModules(modules, config)
+
+  timer.done()
+  return res
 }

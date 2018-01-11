@@ -1,7 +1,5 @@
 // @flow
 
-// TODO: Prefer a global installation of `typescript`
-// TODO: Otherwise, install `typescript` lazily
 // TODO: Load specific version of `typescript` for each package
 
 import path from 'path'
@@ -10,7 +8,9 @@ import fs from 'fsx'
 import type Package from '../../Package'
 import type Module from '../../Bundle/Module'
 
-import {lazyRequire} from '../../utils/lazyRequire'
+// import {lazyInstall} from '../../utils/lazyInstall'
+import {lazyRequire} from '../../utils/lazyInstall'
+import workers from '../../utils/workers'
 import Plugin from '../../Plugin'
 
 let ts: any
@@ -20,6 +20,12 @@ class TypeScriptPlugin extends Plugin {
 
   async load() {
     ts = await lazyRequire('typescript')
+    // const ts = await lazyInstall('typescript')
+    // workers.plugin('typescript', `
+    //   const ts = require('${ts}')
+    //   return (code, options) =>
+    //     ts.transpileModule(code, options).outputText
+    // `)
   }
 
   loadPackage(pkg: Package) {
@@ -37,11 +43,22 @@ class TypeScriptPlugin extends Plugin {
   }
 
   transform(mod: Module, pkg: Package) {
+    const timer = global.bundleTimer('typescript', path.relative(process.cwd(), mod.path))
     const res = ts.transpileModule(mod._body, pkg.meta._tsconfig)
     mod._body = res.outputText
     mod.type = '.js'
+    timer.done()
   }
+
+  // async transform(mod: Module, pkg: Package) {
+  //   const timer = global.bundleTimer('typescript', path.relative(process.cwd(), mod.path))
+  //   mod._body = await workers.call('typescript', mod._body, pkg.meta._tsconfig)
+  //   mod.type = '.js'
+  //   timer.done()
+  // }
 }
+
+TypeScriptPlugin.prototype.name = 'typescript'
 
 module.exports = TypeScriptPlugin
 
@@ -50,4 +67,8 @@ function readConfig(pkg: Package): ?Object {
   try {
     return JSON.parse(fs.readFile(configPath))
   } catch(e) {}
+}
+
+function transform(code, options) {
+  return workers.call('typescript', code, options)
 }

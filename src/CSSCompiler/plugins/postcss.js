@@ -7,7 +7,7 @@ import type Package from '../../Package'
 import type File from '../../File'
 import Plugin from '../../Plugin'
 
-import {lazyRequire} from '../../utils/lazyRequire'
+import {lazyRequire} from '../../utils/lazyInstall'
 import {log} from '../../logger'
 
 let postcss: any
