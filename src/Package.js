@@ -29,7 +29,7 @@ export type PackageConfig = {
 export default class Package { /*::
   path: string;
   meta: Object;
-  dirs: Set<string>;
+  dirs: Map<string, ?string>;
   isLink: boolean;
   parent: ?Package;
   bundler: Bundler;
@@ -51,7 +51,7 @@ export default class Package { /*::
         throw error
       }
     }
-    this.dirs = new Set()
+    this.dirs = new Map()
     if (parent) {
       this.parent = parent
       this.bundler = parent.bundler
@@ -135,10 +135,8 @@ export default class Package { /*::
         filePath.slice(0, 1 - fileType.length) + platform + fileType
       return files[platformPath] || files[filePath]
     }
-    const rel = filePath.slice(this.path.length + 1)
-    if (this.dirs.has(rel)) {
-      filePath = path.join(filePath, 'index')
-    }
+    const dir = this.dirs.get(filePath.slice(this.path.length + 1))
+    if (dir !== undefined) filePath = path.join(dir || filePath, 'index')
     return this._findFile(filePath, platform, preferredType) || null
   }
 

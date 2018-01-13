@@ -44,29 +44,25 @@ export function crawlPackage(pkg: Package, config: CrawlOptions = {}): void {
     for (let i = 0; i < names.length; i++) {
       const name = names[i]
       if (!blacklistRE.test(name) && !excludeRE.test(name)) {
-        let isDir = null
         const filePath = path.join(dir, name)
         const linkedPath = resolveLinks(filePath, (destPath) => {
-          // Keep paths within the root package.
           const rel = path.relative(pkg.path, destPath)
-          if (rel[0] != '.') return false
-
-          // Check if the real path is a directory.
-          isDir = fs.isDir(fs.readLinks(destPath))
-          return true
+          // Keep paths within the root package.
+          return rel[0] == '.'
         })
 
-        // For non-symlinks, we check for directory here.
-        if (isDir == null) {
-          isDir = fs.isDir(filePath)
-        }
-
         const isLink = filePath != linkedPath
+        const isDir = fs.isDir(isLink ? fs.readLinks(linkedPath) : filePath)
+
         if (isDir) {
-          const from = pkg.path.length + 1
-          if (isLink) pkg.dirs.add(filePath.slice(from))
-          pkg.dirs.add(linkedPath.slice(from))
-          deeper(linkedPath)
+          const len = pkg.path.length + 1
+          const rel = linkedPath.slice(len)
+          if (isLink) {
+            // TODO: Support sub-directories of a linked dir.
+            pkg.dirs.set(filePath.slice(len), rel)
+          }
+          pkg.dirs.set(rel, null)
+          deeper(isLink ? filePath : linkedPath)
         }
         else if (bundler.files[filePath] == null) {
           let file = isLink ? bundler.files[linkedPath] : null
