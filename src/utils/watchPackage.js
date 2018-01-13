@@ -56,17 +56,18 @@ export function watchPackage(pkg: Package): Watcher {
   return {
     close() {
       self.close()
-      deps.close()
+      if (deps) deps.close()
     }
   }
 }
 
 // TODO: Support namespaced deps (eg: @aleclarson/fsx)
-function watchDependencies(pkg: Package): Watcher {
+function watchDependencies(pkg: Package): ?Watcher {
   const {packages} = pkg.bundler
 
   const root = path.join(pkg.path, 'node_modules')
-  const deps = {}
+  if (!fs.isDir(root)) return
+
   fs.readDir(root).forEach(name => {
     const filePath = path.join(root, name)
     if (fs.isLink(filePath)) {
