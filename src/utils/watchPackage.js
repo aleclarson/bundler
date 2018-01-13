@@ -70,15 +70,14 @@ function watchDependencies(pkg: Package): ?Watcher {
 
   fs.readDir(root).forEach(name => {
     const filePath = path.join(root, name)
-    if (fs.isLink(filePath)) {
-      // FIXME: This doesn't account for symlinks to packages within the project.
-      const dep = packages[filePath]
-      if (dep) deps[name] = watchPackage(dep)
+    const dep = packages[filePath]
+    if (dep && dep.isLink) {
+      dep.watch()
     }
   })
 
   const opts = {persistent: false}
-  const self = fs.watch(root, opts, (event, name) => {
+  return fs.watch(root, opts, (event, name) => {
     if (event == 'rename') {
       const filePath = path.join(root, name)
       if (packages[filePath] && !fs.exists(filePath)) {
@@ -87,11 +86,4 @@ function watchDependencies(pkg: Package): ?Watcher {
       }
     }
   })
-
-  return {
-    close() {
-      self.close()
-      forEach(deps, (watcher) => watcher.close())
-    }
-  }
 }
