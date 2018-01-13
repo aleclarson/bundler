@@ -74,7 +74,7 @@ export default class Project { /*::
     return createRouter(this, match)
   }
 
-  resolveMain(platform: ?Platform): ?File {
+  resolveMain(platform: Platform): ?File {
     return this.root.resolveMain(platform)
   }
 
@@ -93,7 +93,7 @@ export default class Project { /*::
     // Resolve the entry point.
     let main: ?File
     if (config.main) {
-      main = this.root.getFile(config.main)
+      main = this.root.getFile(config.main, config.platform)
     } else {
       main = this.resolveMain(config.platform)
     }
