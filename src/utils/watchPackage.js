@@ -12,7 +12,7 @@ import type Package from '../Package'
 import {forEach} from '.'
 
 const ignoredExts = ['swp', 'swx'].join('|')
-const ignoredDirs = ['.git', 'node_modules'].join('|')
+const ignoredDirs = ['.git'].join('|')
 const ignoredRE = globRegex(`(**.(${ignoredExts})|(${ignoredDirs})(/**)?)`)
 
 const watching: Set<string> = new Set()
@@ -28,11 +28,19 @@ export function watchPackage(pkg: Package): Watcher {
   }
   watching.add(root)
 
-  const deps = watchDependencies(pkg)
+  let deps = watchDependencies(pkg)
   const opts = {recursive: true, persistent: false}
   const self = fs.watch(root, opts, (event, name) => {
     if (!ignoredRE.test(name)) {
-      if (name == 'package.json') {
+      if (name == 'node_modules') {
+        const filePath = path.join(pkg.path, name)
+        if (fs.isDir(filePath)) {
+          deps = deps || watchDependencies(pkg)
+        } else if (deps) {
+          deps.close()
+          deps = null
+        }
+      } else if (name == 'package.json') {
         // TODO: Should any module resolutions be cleared?
         pkg._readMeta()
       } else {
