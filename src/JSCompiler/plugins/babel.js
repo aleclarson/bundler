@@ -53,8 +53,11 @@ module.exports = BabelPlugin
 function readConfig(pkg: Package): ?Object {
   const configPath = path.join(pkg.path, '.babelrc')
   try {
-    const config = JSON.parse(fs.readFile(configPath))
-    pkg.meta.babel = config
-    return config
-  } catch(e) {}
+    const config = fs.readFile(configPath)
+    return pkg.meta.babel = JSON.parse(config)
+  } catch(err) {
+    if (err.code != 'FILE_NOT_FOUND') {
+      console.warn('Failed to parse JSON: ' + huey.gray(configPath) + ' => ' + huey.red(err.message))
+    }
+  }
 }
