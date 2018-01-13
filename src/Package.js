@@ -30,6 +30,7 @@ export default class Package { /*::
   path: string;
   meta: Object;
   dirs: Set<string>;
+  isLink: boolean;
   parent: ?Package;
   bundler: Bundler;
   watcher: ?Watcher;
@@ -40,6 +41,7 @@ export default class Package { /*::
   constructor(config: PackageConfig) {
     const {root, parent} = config
     this.path = root
+    this.isLink = fs.isLink(root)
     try {
       this._readMeta()
     } catch(error) {
