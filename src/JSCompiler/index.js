@@ -46,6 +46,7 @@ export class JSCompiler extends Compiler { /*::
 
   static plugins = [
     require('./plugins/babel'),
+    require('./plugins/coffee'),
     require('./plugins/typescript'),
   ]
 
