@@ -1,3 +1,4 @@
+// @flow
 
 // Determine a file's format, taking into account any plugins.
 export async function resolveFileType(file: File): Promise<string> {
