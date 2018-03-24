@@ -19,6 +19,7 @@ class CoffeePlugin extends Plugin {
     mod._body = coffee.compile(mod._body, {
       bare: true,
     })
+    mod.type = '.js'
   }
 }
 
