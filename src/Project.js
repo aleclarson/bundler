@@ -4,7 +4,6 @@ import globRegex from 'glob-regex'
 import path from 'path'
 import fs from 'fsx'
 
-import type {MatchFn, RouterFn} from './router'
 import type {CrawlOptions} from './utils/crawlPackage'
 import type {Platform} from './File'
 import type {Watcher} from './utils/watchPackage'
@@ -12,7 +11,6 @@ import type Bundler from './Bundler'
 
 import {resolveFileType} from './utils/resolveFileType'
 import {forEach, uhoh} from './utils'
-import {createRouter} from './router'
 import Package from './Package'
 import Bundle from './Bundle'
 import File from './File'
@@ -68,10 +66,6 @@ export default class Project { /*::
 
   get bundler(): Bundler {
     return this.root.bundler
-  }
-
-  createRouter(match?: MatchFn): RouterFn {
-    return createRouter(this, match)
   }
 
   resolveMain(platform: Platform): ?File {
