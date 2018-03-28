@@ -1,5 +1,7 @@
 // @flow
 
+import type File from '../File'
+
 // Determine a file's format, taking into account any plugins.
 export async function resolveFileType(file: File): Promise<string> {
   const pkg = file.package
