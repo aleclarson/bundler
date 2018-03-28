@@ -63,19 +63,15 @@ export default class PackageMap { /*::
         [pkg.version, pkg]
       ])
     }
+    pkg.hold()
     this.mains.set(pkg, main)
     this.modules.set(pkg, [])
-    if (pkg.isLink) {
-      pkg.watch()
-    }
   }
 
   deletePackage(pkg: Package): void {
     const versions = this.packages[pkg.name]
     if (versions) {
-      if (pkg.watcher) {
-        pkg.watcher.close()
-      }
+      pkg.drop()
       if (versions.size == 1) {
         delete this.packages[pkg.name]
       } else {

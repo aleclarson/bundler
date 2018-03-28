@@ -6,7 +6,6 @@ import fs from 'fsx'
 
 import type {CrawlOptions} from './utils/crawlPackage'
 import type {Platform} from './File'
-import type {Watcher} from './utils/watchPackage'
 import type Bundler from './Bundler'
 
 import {resolveFileType} from './utils/resolveFileType'
@@ -28,7 +27,6 @@ export type ProjectConfig = {
   root: string,
   fileTypes?: string[],
   exclude?: string[],
-  watch?: boolean,
 }
 
 export default class Project { /*::
@@ -54,10 +52,6 @@ export default class Project { /*::
 
     // Cache bundles using a hash.
     this.bundles = {}
-
-    if (config.watch) {
-      this.root.watch()
-    }
 
     this.bundler.events
       .on('file:reload', this._reloadFile.bind(this))

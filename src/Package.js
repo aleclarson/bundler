@@ -8,7 +8,6 @@ import fs from 'fsx'
 
 import type {CrawlOptions} from './utils/crawlPackage'
 import type File, {Platform} from './File'
-import type {Watcher} from './utils/watchPackage'
 import type Bundler from './Bundler'
 import type Plugin from './Plugin'
 
@@ -16,7 +15,6 @@ import {log} from './logger'
 import {getPlugins} from './plugins'
 import {uhoh, search} from './utils'
 import {crawlPackage} from './utils/crawlPackage'
-import {watchPackage} from './utils/watchPackage'
 
 const loadModule = (require: any)
 
@@ -33,9 +31,9 @@ export default class Package { /*::
   isLink: boolean;
   parent: ?Package;
   bundler: Bundler;
-  watcher: ?Watcher;
   crawled: Set<string>;
   fileTypes: Set<string>;
+  holdCount: number;
   plugins: { [fileType: string]: Plugin[] };
 */
   constructor(config: PackageConfig) {
@@ -63,6 +61,7 @@ export default class Package { /*::
     }
     this.crawled = new Set()
     this.fileTypes = new Set()
+    this.holdCount = 0
     this.plugins = {}
   }
 
@@ -86,18 +85,21 @@ export default class Package { /*::
     return version
   }
 
-  crawl(config?: CrawlOptions): void {
-    crawlPackage(this, config)
-  }
-
-  watch(): void {
-    if (!this.watcher) {
-      this.watcher = watchPackage(this)
+  hold() {
+    if (++this.holdCount == 1) {
+      this.bundler.events.emit('package:used', this)
     }
   }
 
-  // TODO: Add ability to watch specific file for changes.
-  // watchFile(filePath: string): void {}
+  drop() {
+    if (--this.holdCount == 0) {
+      this.bundler.events.emit('package:unused', this)
+    }
+  }
+
+  crawl(config?: CrawlOptions): void {
+    crawlPackage(this, config)
+  }
 
   // TODO: Support other file types?
   resolveMain(platform: Platform, preferredType: ?string): ?File {
