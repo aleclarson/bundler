@@ -72,6 +72,10 @@ export default class Bundle { /*::
     return main
   }
 
+  get root(): string {
+    return this.main.package.path
+  }
+
   get bundler(): Bundler {
     return this._main.package.bundler
   }
