@@ -4,6 +4,7 @@
 
 import EventEmitter from 'events'
 import crypto from 'crypto'
+import noop from 'noop'
 import path from 'path'
 import fs from 'fsx'
 import os from 'os'
@@ -41,12 +42,12 @@ export default class Bundle { /*::
   +dev: boolean
   +project: Project
   +platform: Platform
+  error: ?Object
   _map: Map<File, Module>
   _main: File
   _type: string
   _path: string
   _dirty: boolean
-  _events: EventEmitter
   _buildTag: number
   _building: ?Promise<void>
   _compiler: Compiler
@@ -60,7 +61,6 @@ export default class Bundle { /*::
     this._main = config.main
     this._type = config.type
     this._path = getBundlePath(this)
-    this._events = new EventEmitter()
     this._buildTag = 0
 
     this.reset()
@@ -120,9 +120,7 @@ export default class Bundle { /*::
         fs.writeDir(path.dirname(this._path))
         fs.writeFile(this._path, payload)
       }
-    }).catch(error => {
-      this._events.emit('error', error)
-    })
+    }).catch(noop)
     return building
   }
 
@@ -170,18 +168,6 @@ export default class Bundle { /*::
       return true
     }
     return false
-  }
-
-  on(event: string, listener: Function): void {
-    this._events.on(event, listener)
-  }
-
-  off(event: string, listener: ?Function): void {
-    if (listener) {
-      this._events.removeListener(event, listener)
-    } else {
-      this._events.removeAllListeners(event)
-    }
   }
 
   _deleteModule(mod: Module): void {

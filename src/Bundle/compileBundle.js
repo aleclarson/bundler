@@ -5,6 +5,7 @@
 
 import AsyncTaskGroup from 'AsyncTaskGroup'
 import noop from 'noop'
+import path from 'path'
 
 import type Bundle, {Module} from '../Bundle'
 
@@ -32,7 +33,7 @@ export async function compileBundle(
   const modules: Module[] = []
 
   // Module refs that cannot be resolved.
-  const missing = new Map()
+  const missed = new Map()
 
   // Load one module at a time.
   const loading = new AsyncTaskGroup(1)
@@ -71,8 +72,8 @@ export async function compileBundle(
         addModule(mod)
       }
     } else {
-      let refs = missing.get(parent)
-      if (!refs) missing.set(parent, refs = new Set)
+      let refs = missed.get(parent)
+      if (!refs) missed.set(parent, refs = new Set)
       refs.add(ref)
     }
   }
@@ -91,9 +92,24 @@ export async function compileBundle(
   }
 
   // Emit any unresolved refs.
-  if (missing.size) {
+  if (missed.size) {
     bundle._dirty = true
-    bundle._events.emit('missing', missing)
+    bundle.error = {
+      code: 'MISSED_IMPORTS',
+      missed: reduce(missed.keys(), (refs, mod) => {
+        let {imports} = mod.file
+        let name = path.relative(bundle.root, mod.path)
+        // $FlowFixMe
+        missed.get(mod).forEach(ref => {
+          // $FlowFixMe
+          let line = imports.get(ref).line + 1
+          refs.push({
+            ref, line, parent: name,
+          })
+        })
+        return refs
+      }, []),
+    }
   }
 
   // Keep the module list for debugging purposes.
@@ -101,4 +117,14 @@ export async function compileBundle(
 
   // The compiler handles the rest.
   return bundle._compiler.joinModules(modules, config)
+}
+
+// Reduce an iterator.
+function reduce(iter, reducer, init) {
+  let val = init
+  while (true) {
+    let it = iter.next()
+    if (it.done) return val
+    val = reducer(val, it.value)
+  }
 }
