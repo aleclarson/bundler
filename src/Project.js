@@ -14,8 +14,6 @@ import Package from './Package'
 import Bundle from './Bundle'
 import File from './File'
 
-const defaultTypes = ['.js']
-
 type BundleConfig = {
   dev: boolean,
   main?: string,
@@ -25,7 +23,7 @@ type BundleConfig = {
 
 export type ProjectConfig = {
   root: string,
-  fileTypes?: string[],
+  fileTypes: string[],
   exclude?: string[],
 }
 
@@ -43,8 +41,12 @@ export default class Project { /*::
     this.root = bundler.package(root)
 
     // Sort file types for hashing purposes.
-    this.fileTypes = config.fileTypes ?
-      config.fileTypes.sort() : defaultTypes
+    if (Array.isArray(config.fileTypes)) {
+      this.fileTypes = config.fileTypes
+        .filter(dedupe()).sort()
+    } else {
+      throw TypeError('`fileTypes` must be an array')
+    }
 
     // Sort exclude patterns for hashing, too.
     this.excludeRE = config.exclude ?
@@ -134,5 +136,15 @@ export default class Project { /*::
     for (const hash in bundles) {
       bundles[hash].deleteModule(file)
     }
+  }
+}
+
+function dedupe<T>(): T => boolean {
+  let vals = []
+  return (val: T) => {
+    if (vals.includes(val))
+      return false
+    vals.push(val)
+    return true
   }
 }
