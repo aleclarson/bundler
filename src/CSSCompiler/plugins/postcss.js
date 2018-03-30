@@ -8,7 +8,6 @@ import type File from '../../File'
 import Plugin from '../../Plugin'
 
 import {lazyRequire} from '../../utils/lazyRequire'
-import {log} from '../../logger'
 
 let postcss: any
 
@@ -49,7 +48,7 @@ class PostCssPlugin extends Plugin {
   async transform(data: string, pkg: Package): Promise<string> {
     const result = await postcss(pkg.meta.postcss).process(data)
     result.warnings().forEach(warning => {
-      log.warn(warning.toString())
+      pkg.bundler.emit('warn', warning.toString())
     })
     return result.css
   }

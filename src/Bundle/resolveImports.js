@@ -11,8 +11,6 @@ import type Bundler from '../Bundler'
 import type Package from '../Package'
 import type File from '../File'
 
-import {log} from '../logger'
-
 type MaybeAsync<T> = T | Promise<T>
 
 export type ResolveListener =
@@ -84,7 +82,7 @@ function findDependency(name: string, src: File, bundler: Bundler): ?Package {
         return bundler.package(root, pkg)
       } catch(error) {
         if (error.code == 'PJSON_NOT_FOUND') {
-          log.warn('missing package.json => ' + root)
+          bundler.emit('error', error)
         } else {
           throw error
         }

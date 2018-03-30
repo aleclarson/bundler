@@ -1,10 +1,10 @@
 // @flow
 
+import huey from 'huey'
 import path from 'path'
 import os from 'os'
 
 import {installPackage} from './installPackage'
-import {huey} from '../logger'
 
 // Packages are stored in `~/.cara/packages`
 const PACKAGE_DIR = path.join(os.homedir(), '.cara/packages')

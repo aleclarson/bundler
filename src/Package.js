@@ -11,7 +11,6 @@ import type File, {Platform} from './File'
 import type Bundler from './Bundler'
 import type Plugin from './Plugin'
 
-import {log} from './logger'
 import {getPlugins} from './plugins'
 import {uhoh, search} from './utils'
 import {crawlPackage} from './utils/crawlPackage'
@@ -101,12 +100,11 @@ export default class Package { /*::
     crawlPackage(this, config)
   }
 
-  // TODO: Support other file types?
   resolveMain(platform: Platform, preferredType: ?string): ?File {
     const main = this.meta.main || 'index'
     const file = this.getFile(main, platform, preferredType)
     if (file) return file
-    log.warn('missing main module for package: ' + this.path)
+    this.bundler.emit('warn', 'Missing main module for package: ' + this.path)
   }
 
   hasFile(filePath: string): boolean {
@@ -129,7 +127,7 @@ export default class Package { /*::
     const fileType = path.extname(filePath)
     if (fileType) {
       if (!this.fileTypes.has(fileType)) {
-        log.warn('file has unknown type: ' + filePath)
+        this.bundler.emit('warn', 'File has unknown type: ' + filePath)
         return null
       }
       const {files} = this.bundler
