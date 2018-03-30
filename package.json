@@ -10,7 +10,7 @@
     "is-open-comment": "^0.1.1",
     "match-any": "^0.0.1",
     "noop": "aleclarson/noop#0.0.1",
-    "quest": "aleclarson/quest#0.0.1",
+    "quest": "aleclarson/quest#0.6.1",
     "read-body": "^0.0.1",
     "registry-auth-token": "^3.3.1",
     "tar-fs": "^1.16.0"
