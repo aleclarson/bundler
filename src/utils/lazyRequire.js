@@ -16,9 +16,7 @@ export async function lazyRequire(name: string): Promise<any> {
   } catch(e) {
     console.log(huey.red(e.message))
     console.log('Installing package: ' + huey.yellow(name))
-    await installPackage(name, PACKAGE_DIR).catch(error => {
-      console.log('url = ' + error.url)
-    })
+    await installPackage(name, PACKAGE_DIR)
   }
   return require(dep)
 }
