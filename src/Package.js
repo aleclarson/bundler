@@ -87,13 +87,13 @@ export default class Package { /*::
 
   hold() {
     if (++this.holdCount == 1) {
-      this.bundler.events.emit('package:used', this)
+      this.bundler.emit('package:used', this)
     }
   }
 
   drop() {
     if (--this.holdCount == 0) {
-      this.bundler.events.emit('package:unused', this)
+      this.bundler.emit('package:unused', this)
     }
   }
 

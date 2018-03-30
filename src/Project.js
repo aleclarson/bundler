@@ -53,7 +53,7 @@ export default class Project { /*::
     // Cache bundles using a hash.
     this.bundles = {}
 
-    this.bundler.events
+    this.bundler
       .on('file:reload', this._reloadFile.bind(this))
       .on('file:delete', this._deleteFile.bind(this))
   }

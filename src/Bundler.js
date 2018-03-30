@@ -17,17 +17,16 @@ const homedir = require('os').homedir()
 // Initialize compilers for tests.
 require('./compilers')
 
-export default class Bundler { /*::
+export default class Bundler extends EventEmitter { /*::
   files: { [filePath: string]: File };
   packages: { [root: string]: Package };
   versions: { [id: string]: Package };
-  events: EventEmitter;
 */
   constructor() {
+    super()
     this.files = {}
     this.packages = {}
     this.versions = {}
-    this.events = new EventEmitter()
   }
 
   project(config: ProjectConfig): Project {
@@ -85,7 +84,7 @@ export default class Bundler { /*::
   reloadFile(filePath: string): boolean {
     const file = this.files[filePath]
     if (file) {
-      this.events.emit('file:reload', file)
+      this.emit('file:reload', file)
       return true
     }
     return false
@@ -95,7 +94,7 @@ export default class Bundler { /*::
     const file = this.files[filePath]
     if (file) {
       delete this.files[filePath]
-      this.events.emit('file:delete', file)
+      this.emit('file:delete', file)
       return true
     }
     return false
