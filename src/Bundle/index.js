@@ -140,7 +140,7 @@ export default class Bundle { /*::
   addModule(file: File): Module {
     let mod = this._map.get(file)
     if (mod) {
-      uhoh(`Module already exists: '${file.path}'`, 'MODULE_EXISTS')
+      throw uhoh(`Module already exists: '${file.path}'`, 'MODULE_EXISTS')
     } else {
       mod = this._compiler.createModule(file)
       this._map.set(file, mod)

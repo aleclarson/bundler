@@ -49,5 +49,5 @@ export function uhoh(message: string, code: ?(number|string)): void {
   const error: any = Error(message)
   if (code) error.code = code
   Error.captureStackTrace(error, uhoh)
-  throw error
+  return error
 }
